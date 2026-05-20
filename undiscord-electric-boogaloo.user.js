@@ -303,6 +303,7 @@
 	var mainCss = (`
 /**** Undiscord Button ****/
 #undicord-btn { position: relative; width: auto; height: 24px; margin: 0 8px; cursor: pointer; color: var(--interactive-normal); flex: 0 0 auto; }
+#undicord-btn.undiscord-floating { position: fixed !important; bottom: 24px !important; right: 24px !important; z-index: 999999 !important; margin: 0 !important; padding: 8px !important; border-radius: 50% !important; background: var(--background-floating, #2b2d31) !important; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45) !important; }
 #undicord-btn progress { position: absolute; top: 23px; left: -4px; width: 32px; height: 12px; display: none; }
 #undicord-btn.running { color: var(--button-danger-background) !important; }
 #undicord-btn.running progress { display: block; }
@@ -1644,22 +1645,65 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	    e.stopPropagation();
 	    toggleWindow();
 	  };
+	  const isUndiscordBtnVisible = () => {
+	    if (!ui.undiscordBtn?.isConnected) return false;
+	    const r = ui.undiscordBtn.getBoundingClientRect();
+	    return r.width > 0 && r.height > 0;
+	  };
+
 	  function findToolbar() {
 	    const root = document.querySelector('#app-mount');
 	    if (!root) return null;
-	    // Discord renames hashed classes often — try several patterns (see upstream #793 / v5.2.6)
-	    return root.querySelector('[class*="toolbar__"]')
-	      || root.querySelector('[class^="toolbar_"]')
-	      || root.querySelector('[class*="-toolbar"]')
-	      || root.querySelector('[class^="toolbar"]');
+
+	    // Discord renames hashed classes often (#779, #793, #750, PR #762)
+	    const selectors = [
+	      '[class*="upperContainer"] [class*="toolbar"]',
+	      '[class*="upperContainer"] [class^="toolbar_"]',
+	      '[class*="chat"] [class*="toolbar"]',
+	      '[class*="toolbar__"]',
+	      '[class^="toolbar_"]',
+	      '[class*="-toolbar"]',
+	      '[class^="toolbar"]',
+	    ];
+	    for (const sel of selectors) {
+	      const el = root.querySelector(sel);
+	      if (el) {
+	        const r = el.getBoundingClientRect();
+	        if (r.width > 0 && r.height > 0) return el;
+	      }
+	    }
+
+	    const candidates = root.querySelectorAll('[class*="toolbar"], [class^="toolbar_"], [class*="-toolbar"]');
+	    for (let i = candidates.length - 1; i >= 0; i--) {
+	      const r = candidates[i].getBoundingClientRect();
+	      if (r.width > 0 && r.height > 0) return candidates[i];
+	    }
+	    return candidates[candidates.length - 1] || null;
 	  }
-	  function mountBtn() {
-	    const toolbar = findToolbar();
-	    if (!toolbar) return false;
-	    if (!toolbar.contains(ui.undiscordBtn)) toolbar.appendChild(ui.undiscordBtn);
+
+	  function mountFloatingBtn() {
+	    ui.undiscordBtn.classList.add('undiscord-floating');
+	    if (!document.body.contains(ui.undiscordBtn)) document.body.appendChild(ui.undiscordBtn);
 	    return true;
 	  }
+
+	  function mountBtn() {
+	    const toolbar = findToolbar();
+	    if (toolbar) {
+	      ui.undiscordBtn.classList.remove('undiscord-floating');
+	      if (!toolbar.contains(ui.undiscordBtn)) toolbar.appendChild(ui.undiscordBtn);
+	      if (isUndiscordBtnVisible()) return true;
+	    }
+	    return mountFloatingBtn();
+	  }
+
 	  mountBtn();
+	  let mountTries = 0;
+	  const mountRetryTimer = setInterval(() => {
+	    mountBtn();
+	    if (isUndiscordBtnVisible() || ++mountTries >= 24) clearInterval(mountRetryTimer);
+	  }, 2500);
+
 	  // watch for changes and re-mount button if necessary
 	  const discordElm = document.querySelector('#app-mount');
 	  let observerThrottle = null;
@@ -1667,8 +1711,8 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	    if (observerThrottle) return;
 	    observerThrottle = setTimeout(() => {
 	      observerThrottle = null;
-	      if (!discordElm?.contains(ui.undiscordBtn)) mountBtn();
-	    }, 1000);
+	      if (!isUndiscordBtnVisible()) mountBtn();
+	    }, 800);
 	  });
 	  if (discordElm) observer.observe(discordElm, { attributes: false, childList: true, subtree: true });
 

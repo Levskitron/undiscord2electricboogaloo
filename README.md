@@ -13,7 +13,7 @@ The original Undiscord project has been largely inactive for months, with [dozen
 - **Rich filtering** — text search, `has: link` / `has: file`, regex patterns, pinned messages, message ID ranges, and date ranges.
 - **Batch jobs** — comma-separated channel IDs, or import `messages/index.json` from a [Discord data export](https://support.discord.com/hc/en-us/articles/360004957031) to wipe many channels at once.
 - **Rate-limit aware** — adjusts search and delete delays when Discord throttles requests.
-- **Modern UI** — Discord-dark theme, draggable/resizable window, sidebar toggle, in-panel logging, and streamer mode to redact sensitive fields.
+- **Modern UI** — Discord-dark theme, draggable/resizable window, sidebar toggle, in-panel logging, and privacy mode to mask sensitive fields and log lines.
 - **Up-to-date Discord integration** — toolbar button mounts on current Discord class names and re-attaches when the client re-renders.
 
 ## Requirements
@@ -50,7 +50,7 @@ For field-by-field help, the in-app links point to the [original Undiscord wiki]
 ### Tips
 
 - Start with conservative **search** and **delete** delays if you hit rate limits; the script will increase delays automatically when throttled.
-- Use **Streamer mode** before sharing your screen — it hides tokens and other private fields.
+- Use **Privacy mode** before sharing your screen — it masks tokens, IDs, and deletion log content (toggle anytime).
 - Deleting large histories can take a long time; keep the tab open until the run finishes.
 
 ## Why this fork?

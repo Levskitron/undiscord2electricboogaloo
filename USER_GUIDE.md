@@ -4,25 +4,31 @@
 
 **Version covered:** 1.3.1 · Script: [`undiscord-electric-boogaloo.user.js`](./undiscord-electric-boogaloo.user.js)
 
+> [!CAUTION]
+> **Using this tool can get your Discord account suspended or permanently banned.** It automates your normal user account (what Discord calls a “self-bot”) — not an official bot. That breaks Discord’s rules even when you only delete **your own** messages.
+>
+> Discord may act **with or without warning**. You are solely responsible if you use this script. Read [Important warnings](#important-warnings-read-first) before installing or clicking **Delete**.
+
 ---
 
 ## Table of contents
 
 1. [What is this?](#what-is-this)
-2. [Important warnings (read first)](#important-warnings-read-first)
-3. [What you need](#what-you-need)
-4. [Install the tool](#install-the-tool)
-5. [Open the tool on Discord](#open-the-tool-on-discord)
-6. [The panel — quick tour](#the-panel--quick-tour)
-7. [Run profiles (pick your mode)](#run-profiles-pick-your-mode)
-8. [Step-by-step: common jobs](#step-by-step-common-jobs)
-9. [Every setting explained](#every-setting-explained)
-10. [Footer buttons](#footer-buttons)
-11. [When something goes wrong](#when-something-goes-wrong)
-12. [Privacy in plain English](#privacy-in-plain-english)
-13. [Glossary](#glossary)
-14. [FAQ](#faq)
-15. [More help](#more-help)
+2. [How long will this take? (be realistic)](#how-long-will-this-take-be-realistic)
+3. [Important warnings (read first)](#important-warnings-read-first)
+4. [What you need](#what-you-need)
+5. [Install the tool](#install-the-tool)
+6. [Open the tool on Discord](#open-the-tool-on-discord)
+7. [The panel — quick tour](#the-panel--quick-tour)
+8. [Run profiles (pick your mode)](#run-profiles-pick-your-mode)
+9. [Step-by-step: common jobs](#step-by-step-common-jobs)
+10. [Every setting explained](#every-setting-explained)
+11. [Footer buttons](#footer-buttons)
+12. [When something goes wrong](#when-something-goes-wrong)
+13. [Privacy in plain English](#privacy-in-plain-english)
+14. [Glossary](#glossary)
+15. [FAQ](#faq)
+16. [More help](#more-help)
 
 ---
 
@@ -40,32 +46,103 @@ The tool helps you **delete many of your own messages at once** — faster than 
 
 Think of it as a **helper robot** that finds *your* old messages and asks Discord to remove them, one batch at a time, while you keep the browser tab open.
 
+> [!IMPORTANT]
+> **This is not made or approved by Discord.** Discord’s normal website does not offer bulk delete. If something goes wrong with your account, Discord support will not treat this as an official feature.
+
+---
+
+## How long will this take? (be realistic)
+
+Bulk delete is **tedious and slow** on every tool like this — including this one. There is no magic “delete my whole history in five minutes” button. Discord only lets you remove messages **one at a time through the API**, with **waits** between searches and deletes so you do not overwhelm their servers.
+
+> [!IMPORTANT]
+> **Plan for hours, not minutes.** For most real cleanups you should expect the browser tab to stay open and the tool to run for a long time. That is normal, not a sign that something is broken.
+
+### Rough guide (your mileage will vary)
+
+| How many of **your** messages (approx.) | What to expect |
+|----------------------------------------|----------------|
+| A few hundred | Often **under an hour**, still not instant |
+| A few thousand | Commonly **several hours** |
+| **10,000+** | Very often **a full day or more** |
+| Tens or hundreds of thousands | **Days** are common; **weeks** are possible on server-wide wipes or many channels |
+
+The log may show an **estimated time remaining (ETA)**. Treat it as a rough guess — Discord rate limits, empty search pages, and your settings will change the real finish time.
+
+### Why it cannot go much faster
+
+1. **Discord throttles you** — If you delete or search too quickly, you get **rate limited** (HTTP 429). The tool then waits longer. Fighting that by cranking speeds down only makes limits worse.
+2. **Built-in delays** — Even **Fast wipe** waits between search pages (~30 seconds) and between each delete (~1 second). Those pauses add up: thousands of messages means thousands of seconds minimum, before counting search time and retries.
+3. **More messages = more time, full stop** — The biggest factor is simply **how many messages you have**. No profile avoids that math.
+
+### Speed vs risk (settings matter, but only so much)
+
+You can change **Search delay** and **Delete delay** under **Advanced** (or pick **Careful wipe** / **Fast wipe** presets):
+
+| If you… | What usually happens |
+|---------|----------------------|
+| Use **slower** delays (Careful wipe, higher delete delay) | Longer total time, often fewer rate limits and less stress on your account |
+| Use **faster** delays (lower numbers in Advanced) | Shorter time *if* Discord allows it — but **more rate limits**, more errors, and **more risk** to your account |
+
+> [!WARNING]
+> **Faster settings do not make bulk delete “safe.”** They only trade time for risk. Even at the **fastest** settings this tool offers, a very large history is **unlikely to finish in less than a day**:
+>
+> - **10,000+ messages** — plan for **at least ~24 hours** in many cases; often longer if rate limited  
+> - **100,000+ messages** — think **days**  
+> - **Server wipe** across many channels — think **days to weeks**
+
+There is no responsible way to promise “done tonight” for huge archives. If someone claims their Undiscord fork deletes hundreds of thousands of messages in an hour, they are not describing how Discord’s limits work in practice.
+
+### What you should do in real life
+
+- Pick a time when your computer can stay on and the **Discord tab can stay open** (or use **checkpoint resume** on server wipe if you must stop).
+- Use **Session & logs** options if you want a record of a multi-day run.
+- Click **Stop** when you need a break; you can often run **Delete** again later (or **Resume** a server wipe).
+- Do **not** expect to babysit a 200,000-message channel in one sitting unless you are using **Review photos & backup** (that mode is even slower because *you* click through every batch).
+
+> [!TIP]
+> **Smaller scope = less waiting.** One channel, a date range, or a text filter deletes fewer messages and finishes sooner — but only if that matches what you actually want gone.
+
 ---
 
 ## Important warnings (read first)
 
-### Your Discord account can be banned
+> [!CAUTION]
+> **Account termination**
+>
+> Discord forbids automating normal user accounts outside the official bot system. Bulk deletion through this script is **self-bot automation**. Discord’s policies include:
+>
+> - **[Terms of Service](https://discord.com/terms)** — you must not use unauthorized automation, scraping tools, or software that modifies the service (see *Restrictions on your use of Discord’s services*).
+> - **[Automated User Accounts (Self-Bots)](https://support.discord.com/hc/en-us/articles/115002192352-Automated-User-Accounts-Self-Bots)** — automating a user account can result in **account termination**.
+> - **[Developer Terms](https://discord.com/developers/docs/legal)** — this tool is not a registered Discord application using OAuth2.
+>
+> **You choose to use this at your own risk.** The maintainers of this project are not responsible if Discord suspends or bans your account.
 
-Discord’s rules say you are **not allowed to automate a normal user account** (a “self-bot”) the way this tool does. Using it **can get your account suspended or permanently banned**, even if you only delete your own messages.
+> [!WARNING]
+> **Install only from a source you trust**
+>
+> A modified copy of the script can **steal your login token** and take over your account, or delete the wrong things. Prefer the official file:
+>
+> - [undiscord-electric-boogaloo.user.js (official raw link)](https://github.com/Levskitron/undiscord2electricboogaloo/raw/main/undiscord-electric-boogaloo.user.js)
+>
+> If your userscript manager **auto-updates** scripts, review updates before accepting them — a bad update has the same risk as a bad download.
 
-**You choose to use this at your own risk.** The people who made this tool are not responsible if Discord takes action against your account.
+> [!CAUTION]
+> **Deletion is permanent**
+>
+> There is **no undo**. Messages removed through Discord’s API are gone. If you might regret it, use **Review photos & backup**, export your [Discord data](https://support.discord.com/hc/en-us/articles/360004957031), or run a small test channel first.
 
-Official Discord links (for adults / guardians to read):
+> [!IMPORTANT]
+> **Author ID is required before every run**
+>
+> If **Author ID** is empty, the tool may search the whole channel and attempt to delete messages you **do not own**. You will see **403** errors, wasted time, and risk stressing Discord’s API for no benefit.
+>
+> Always confirm **Author ID** is filled, then click **Me** if it is blank. The script blocks starting without it, but double-check anyway.
 
-- [Discord Terms of Service](https://discord.com/terms)
-- [Automated User Accounts (Self-Bots)](https://support.discord.com/hc/en-us/articles/115002192352-Automated-User-Accounts-Self-Bots)
-
-### Only install from a source you trust
-
-A fake copy of the script could **steal your account**. Install from this project’s official file, or a copy you have checked yourself:
-
-- [Official script on GitHub](https://github.com/Levskitron/undiscord2electricboogaloo/raw/main/undiscord-electric-boogaloo.user.js)
-
-### Author ID is required
-
-If **Author ID** (your user ID) is empty, the tool may search the whole channel and try to delete messages you **cannot** delete. You will see errors like **403** and nothing useful will happen.
-
-Always make sure **Author ID** is filled before you press **Delete**. Click **Me** if it is blank.
+> [!WARNING]
+> **Read the source if you can**
+>
+> Open source is not automatic safety. Before trusting any userscript, skim [`undiscord-electric-boogaloo.user.js`](./undiscord-electric-boogaloo.user.js) (or ask someone technical you trust). See **[PRIVACY.md](./PRIVACY.md)** for what it stores and where it sends data.
 
 ---
 
@@ -83,7 +160,10 @@ Always make sure **Author ID** is filled before you press **Delete**. Click **Me
 - [Tampermonkey](https://www.tampermonkey.net/) (Chrome, Edge, Firefox, etc.)
 - [Violentmonkey](https://violentmonkey.github.io/)
 
-When the manager asks about **GM_download**, say **yes** if you want organized folders for saved photos and log files on your computer. The script only uses that to save files **to your PC**, not to send data to strangers.
+When the manager asks about **GM_download**, say **yes** if you want organized folders for saved photos and log files on your computer.
+
+> [!IMPORTANT]
+> **GM_download** is only used to save log and media files **onto your computer**. It is not used to upload your messages or token to this GitHub project or other third parties. Core delete/search still talks to **discord.com** only.
 
 ---
 
@@ -97,6 +177,9 @@ When the manager asks about **GM_download**, say **yes** if you want organized f
 4. Finish any setup screens.
 
 ### Step 2 — Install Undiscord Electric Boogaloo
+
+> [!WARNING]
+> Do not install “Undiscord fixes” from random forums, Discord DMs, or unknown paste sites. **One changed line** in the script is enough to steal your token.
 
 1. Open this link (or ask a trusted adult to open it):  
    [undiscord-electric-boogaloo.user.js](https://github.com/Levskitron/undiscord2electricboogaloo/raw/main/undiscord-electric-boogaloo.user.js)
@@ -125,7 +208,11 @@ If you see the trash icon, installation worked.
    - Click the trash icon again to **hide** the panel — that does **not** stop a job that is already running.
 3. If you do not see the trash icon, refresh the page (F5) and wait a few seconds for Discord to load.
 
-**While a delete job is running:** keep the **browser tab open**. You can switch to another tab, but do not close Discord’s tab completely if you want the job to continue.
+> [!WARNING]
+> **Hiding the panel is not the same as stopping.** If deletion is running, you must click **🛑 Stop** to cancel. Closing the trash panel only hides the window.
+
+> [!IMPORTANT]
+> **While a delete job is running, keep the Discord browser tab open.** You can switch to another tab on the same browser, but closing Discord’s tab **stops** the run (except server wipe may offer **Resume** if you saved a checkpoint).
 
 ---
 
@@ -179,11 +266,14 @@ Changing random settings after you pick a profile usually switches you to **Cust
 3. It searches for your messages and deletes them in batches.
 4. Waits between searches and deletes so Discord does not get angry (rate limits).
 
-**Good for:** Thousands or hundreds of thousands of messages in **one** channel.
+**Good for:** Thousands or hundreds of thousands of messages in **one** channel — as long as you accept it will run for **hours or days** (see [How long will this take?](#how-long-will-this-take-be-realistic)).
 
-**Not good for:** Saving every photo first (use Review photos & backup).
+**Not good for:** Saving every photo first (use Review photos & backup). Not for “I need this done in ten minutes” on a huge history.
 
 **Analogy:** Robot vacuum — press start and let it run. Keep the tab open.
+
+> [!WARNING]
+> **Fast wipe does not ask “Are you sure?”** once you click **Delete**, it starts immediately. Double-check **Author ID**, **Server ID**, and **Channel ID** before you press the button.
 
 | Setting (automatic) | Value |
 |---------------------|-------|
@@ -229,10 +319,11 @@ Changing random settings after you pick a profile usually switches you to **Cust
    - **Skip batch** — leave this batch alone for now
 5. You must **stay at the computer** and click through batches.
 
-**Important rules:**
+> [!IMPORTANT]
+> **One channel only.** Do not enable **“All message channels in this server”** with this profile — interactive review cannot run server-wide.
 
-- **One channel only** — do not turn on “All message channels in this server.”
-- Not for deleting 100,000 text-only messages — that would take forever. Use **Fast wipe** for that.
+> [!WARNING]
+> Not for huge text-only histories (e.g. 100,000+ messages). You must click through every batch yourself. Use **Fast wipe** for large unattended deletes.
 
 **Downloads go to:** `Undiscord_Media/YourName/ServerName/ChannelName/` on your computer (when GM_download works).
 
@@ -258,6 +349,12 @@ Changing random settings after you pick a profile usually switches you to **Cust
 - One channel only — **Fast wipe** is simpler.
 
 **Analogy:** Cleaning your stuff out of every room in a house, not just one room.
+
+> [!CAUTION]
+> **Server wipe can run for days or weeks** on active servers. Pre-count may show very large numbers. Read the confirmation popup carefully. Do not lower delete delays to “go faster” — that increases **rate limits** and **ban risk**, and still will not turn a massive server into an hour-long job.
+
+> [!WARNING]
+> Server wipe needs a **real server ID** (from **Current** in that server), not `@me`. DMs are not a server-wide wipe — use single-channel workflows instead.
 
 | Setting (automatic) | Value |
 |---------------------|-------|
@@ -294,6 +391,9 @@ If you are new, **stay on Fast wipe** until you know what you need.
 
 ### Job A — Delete everything I said in one channel (most common)
 
+> [!IMPORTANT]
+> Before **Delete**: **Author ID** filled (**Me**), **Server** and **Channel** filled (**Current**), **“All message channels”** unchecked.
+
 1. Open Discord in the browser.
 2. Click the channel you want to clean.
 3. Open the trash panel.
@@ -305,10 +405,14 @@ If you are new, **stay on Fast wipe** until you know what you need.
    - Leave **“All message channels in this server”** **unchecked**.
 6. **Filters:** leave everything empty unless you only want certain messages (see [Filters](#filters)).
 7. Click **▶ Delete**.
-8. Watch the log. It can take **hours or days** for huge channels.
+8. Watch the log — see [How long will this take?](#how-long-will-this-take-be-realistic). Small jobs: under an hour. **10,000+ messages: often a day or more.**
 9. To pause: click **🛑 Stop** (not just close the panel).
 
-**Tip:** If the run stops early saying there are no more messages but you know there are more, open **Advanced** and raise **Empty page retries** to 4 or 6, then run again.
+> [!TIP]
+> If the run stops early with “no more messages” but you know more exist, open **Advanced** → raise **Empty page retries** to 4–6 → run **Delete** again. Discord’s search index often lags on huge channels.
+
+> [!CAUTION]
+> Large jobs still count as forbidden automation no matter how long they take. Slower delays may reduce rate limits but **do not** make the process “allowed” by Discord — only somewhat less bumpy.
 
 ---
 
@@ -333,6 +437,9 @@ Same as Job A, but set **Run profile** to **Careful wipe** and read the confirma
 ---
 
 ### Job D — Leave a server, delete my messages in all its channels
+
+> [!CAUTION]
+> You are about to delete across **every channel the tool can find** in that server. Confirm the **server name** in the pre-count / popup matches the server you intend. Wrong **Server ID** = wrong server or failed run.
 
 1. Open **any channel** in that server.
 2. **Run profile:** **Server wipe (all channels)**.
@@ -402,8 +509,14 @@ Same as Job A, but set **Run profile** to **Careful wipe** and read the confirma
 | **Has file** | Only messages with an attachment. |
 | **Delete pinned messages** | If **on**, pinned messages can be deleted too. If **off**, pins are skipped. |
 | **Include bot / app messages** | Usually leave **off** — deleting bot messages often fails. |
+
+> [!WARNING]
+> Turning on **Include bot / app messages** can make the tool try to delete posts you did not write (bots, webhooks). That causes **403** errors and wasted API calls. Only enable if you understand why.
 | **Regex pattern** | Advanced: only messages matching a pattern. |
 | **Keep messages (inverse)** | Checked = **do not delete** those (e.g. keep all messages with links, delete the rest). |
+
+> [!WARNING]
+> **Inverse filters are easy to misunderstand.** If you check “Keep messages with links” without other filters, you may delete **everything else** in the channel — including messages you meant to keep. Start with no filters unless you know exactly what you want.
 
 ---
 
@@ -427,6 +540,9 @@ Same as Job A, but set **Run profile** to **Careful wipe** and read the confirma
 | **Skip batch** | Do not delete anything this round |
 | **Delete all** | Delete every message in the batch |
 | **Abort** | Stop the whole run |
+
+> [!CAUTION]
+> Buttons like **Delete all** and **Delete selected** remove messages **immediately** for that batch. There is no recycle bin. Read the button label before you click.
 
 ---
 
@@ -470,14 +586,15 @@ See Discord’s guide: [Requesting all of your data](https://support.discord.com
 
 | Setting | Simple explanation |
 |---------|-------------------|
-| **Search delay** | Seconds to wait between searching for the next page of messages (default 30). |
-| **Delete delay** | Seconds between each single delete (default 1). Raise if you get rate limited. |
+| **Search delay** | Seconds to wait between searching for the next page of messages (default 30). Lower = faster searches but more risk of rate limits. |
+| **Delete delay** | Seconds between each single delete (default 1). Lower = faster deletes but more risk. Raise if you get rate limited. See [How long will this take?](#how-long-will-this-take-be-realistic). |
 | **Empty page retries** | How many times to retry when search says “nothing found” but you expect more (default 2). |
 | **Confirm before first delete batch** | One “Are you sure?” popup with preview. |
 | **Unarchive threads before delete** | Try to unarchive old threads so messages inside can be deleted. |
 | **Token → Fill** | Lets the tool read your login token from Discord (like the website uses). Only needed if delete fails with auth errors. |
 
-> **Token warning:** Your token is like a password for your account. Never share it. Use **Privacy mode** if someone can see your screen.
+> [!CAUTION]
+> **Your token is full account access.** Anyone with it can act as you on Discord until it is reset. Never paste it into websites, DMs, or screenshots. Use **Privacy mode** if someone can see your screen. **Fill** only reads the token for **discord.com** — a malicious script could send it elsewhere; that is why trusted install matters.
 
 ---
 
@@ -490,6 +607,9 @@ See Discord’s guide: [Requesting all of your data](https://support.discord.com
 | **Copy log** | Copies the log text to clipboard |
 | **Clear log** | Empties the log window |
 | **Privacy mode** | Masks IDs and sensitive text in the form and log |
+
+> [!TIP]
+> Leave **Privacy mode** on if you stream, share your screen, or use Discord in public. It hides IDs and token fields from view — it does not encrypt your disk or stop a malicious script.
 | **Auto scroll** | Log follows new lines automatically |
 | **Verbose log** | More technical details in the log |
 | **Log each deletion** | Writes every single deleted message in the log (very long on big jobs) |
@@ -497,6 +617,9 @@ See Discord’s guide: [Requesting all of your data](https://support.discord.com
 ---
 
 ## When something goes wrong
+
+> [!WARNING]
+> Repeated **rate limits (HTTP 429)** mean Discord wants you to slow down. Forcing faster delays does not make deletion “more legal” — it increases the chance of throttling or account action. Raise **Delete delay** and use **Careful wipe**.
 
 ### “Author ID is required” or deletes fail with 403
 
@@ -540,6 +663,9 @@ See Discord’s guide: [Requesting all of your data](https://support.discord.com
 
 - Almost always means **Author ID** was wrong or empty. Fix Author ID before running again.
 
+> [!IMPORTANT]
+> **403 errors on someone else’s username** mean the tool tried to delete messages that are not yours. Stop, set **Author ID** with **Me**, and do not restart until it shows **your** ID.
+
 ---
 
 ## Privacy in plain English
@@ -551,6 +677,9 @@ See Discord’s guide: [Requesting all of your data](https://support.discord.com
 - **Server wipe resume** data is stored in your browser’s **local storage** until you resume or discard.
 
 Full details: **[PRIVACY.md](./PRIVACY.md)**
+
+> [!IMPORTANT]
+> This project does **not** run servers that receive your chats. If a script ever sends your token or messages to a domain other than **discord.com** for core delete/search, **stop using it** — that would not match this project’s documented behavior.
 
 ---
 
@@ -586,13 +715,22 @@ Not if **Author ID** is correct — it targets **your** messages only.
 Only if you use a **mobile browser** with a userscript manager that supports Discord’s website. The Discord phone app alone does not run this script.
 
 **How long will 100,000 messages take?**  
-Often many hours or multiple days. Depends on delays and rate limits. The log shows an estimated time remaining (ETA).
+
+> [!IMPORTANT]
+> There is no exact answer — it depends on your delays, rate limits, and how often Discord makes the tool wait. **100,000 messages at ~1 second per delete is already ~28 hours of deleting alone**, before search time, empty-page retries, and 429 pauses. In practice, **plan for multiple days**. The same logic applies to **10,000+** (often **24+ hours** even on Fast wipe). See [How long will this take?](#how-long-will-this-take-be-realistic).
+
+**Why is it so slow compared to clicking delete myself?**  
+Because the tool still deletes **one message per API call** and must **wait** between actions so Discord does not block you. It saves your fingers, not Discord’s clock.
 
 **Can I undo?**  
-**No.** Deleted messages are gone. Use **Review photos & backup** or export data first if you might regret it.
+
+> [!CAUTION]
+> **No.** Deleted messages cannot be restored by this tool or by this project. Plan ahead.
 
 **Does closing the trash panel stop deletion?**  
-**No.** Use **Stop**.
+
+> [!WARNING]
+> **No.** Only **🛑 Stop** ends an active run.
 
 **What’s the difference between README and this guide?**  
 **README** is a project overview for GitHub. **This guide** is for humans using the tool day to day.
@@ -613,4 +751,5 @@ Often many hours or multiple days. Depends on delays and rate limits. The log sh
 **Original project:** [Undiscord by Victornpb](https://github.com/victornpb/undiscord)  
 **This fork:** [Levskitron / undiscord2electricboogaloo](https://github.com/Levskitron/undiscord2electricboogaloo)
 
-*You are responsible for how you use this tool. When in doubt, stop with **🛑 Stop**, read the log, and fix **Author ID** and **Target** before trying again.*
+> [!CAUTION]
+> You are responsible for how you use this tool — including account bans, accidental mass deletion, and data loss. When in doubt: **🛑 Stop**, read the log, fix **Author ID** and **Target**, then read [When something goes wrong](#when-something-goes-wrong) before trying again.

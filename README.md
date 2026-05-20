@@ -55,7 +55,7 @@ Copy [`undiscord-electric-boogaloo.user.js`](./undiscord-electric-boogaloo.user.
 
 ## User guide
 
-**New to this tool?** See **[USER_GUIDE.md](./USER_GUIDE.md)** — a full walkthrough in plain language (install, profiles, every setting, troubleshooting).
+**New to this tool?** See **[USER_GUIDE.md](./USER_GUIDE.md)** — a full walkthrough in plain language (install, profiles, every setting, troubleshooting). Bulk delete is **slow by nature** (hours to days for large histories); the guide explains realistic timelines.
 
 ## Quick start
 

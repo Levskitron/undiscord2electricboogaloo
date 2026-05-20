@@ -1,5 +1,8 @@
 # Undiscord 2: Electric Boogaloo
 
+> [!WARNING]
+> **This script violates Discord’s [Terms of Service](https://discord.com/terms).** Using it automates actions against Discord’s API in ways Discord does not permit. **Your account may be banned** — temporarily or permanently. Use this script only if you accept that risk, and proceed with **extreme caution**.
+
 An overhauled, maintained fork of [Undiscord](https://github.com/victornpb/undiscord) — a userscript that bulk-deletes your own messages on Discord via the web client.
 
 The original Undiscord project has been largely inactive for months, with [dozens of open issues and pull requests](https://github.com/victornpb/undiscord/issues) and a UI that no longer matches Discord’s current layout. **Undiscord 2: Electric Boogaloo** keeps the same core workflow while fixing styling, toolbar integration, and the kinds of papercuts that piled up upstream.

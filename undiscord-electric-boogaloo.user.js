@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name            Undiscord 2: Electric Boogaloo
-// @description     Versatile Undiscord fork — fast bulk wipe or interactive media backup & delete.
+// @description     Bulk-delete your Discord messages: fast wipe, server-wide cleanup, media backup gallery, checkpoints, and reliability fixes.
 // @version         1.3.0
 // @author          Levskitron
 // @homepageURL     https://github.com/Levskitron/undiscord2electricboogaloo

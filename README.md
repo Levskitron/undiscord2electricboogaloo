@@ -53,6 +53,10 @@ What you delete and which filters you use is **your business**. This project is 
 
 Copy [`undiscord-electric-boogaloo.user.js`](./undiscord-electric-boogaloo.user.js) into a new userscript in your manager, save, and reload Discord.
 
+## User guide
+
+**New to this tool?** See **[USER_GUIDE.md](./USER_GUIDE.md)** — a full walkthrough in plain language (install, profiles, every setting, troubleshooting).
+
 ## Quick start
 
 1. Open the channel (or server) you want to clean up.

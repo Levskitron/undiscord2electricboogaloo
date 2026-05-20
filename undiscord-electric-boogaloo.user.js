@@ -943,6 +943,9 @@
 	    logEveryDeletion: false, // Log each deleted message in the panel
 	    maxAttempt: 2, // Attempts to delete a single message if it fails
 	    askForConfirmation: true,
+	    retryOnNetworkError: true,
+	    maxNetworkRetries: 8,
+	    networkRetryBaseDelay: 1000,
 	  };
 
 	  state = {
@@ -958,7 +961,13 @@
 	    _messagesToDelete: [],
 	    _skippedMessages: [],
 	    emptyPageRetryCount: 0,
+	    _emptyPageStreak: 0,
 	    pinnedSkipCount: 0,
+	    _historyScanActive: false,
+	    _historyBeforeId: null,
+	    _historyExhausted: false,
+	    _rawDiscoveredCount: 0,
+	    _forcedChannelFilterActive: false,
 	  };
 
 	  stats = {
@@ -977,6 +986,8 @@
 
 	  _userStopped = false;
 	  _runFinished = false;
+	  _activeRequestController = null;
+	  _pendingWait = null;
 
 	  resetState() {
 	    this.state = {
@@ -992,12 +1003,180 @@
 	      _messagesToDelete: [],
 	      _skippedMessages: [],
 	      emptyPageRetryCount: 0,
+	      _emptyPageStreak: 0,
 	      pinnedSkipCount: 0,
+	      _historyScanActive: false,
+	      _historyBeforeId: null,
+	      _historyExhausted: false,
+	      _rawDiscoveredCount: 0,
+	      _forcedChannelFilterActive: false,
 	    };
 
 	    this._skipHintShown = false;
 	    this._pinnedHintShown = false;
+	    this._activeRequestController = null;
+	    this._pendingWait = null;
 	    this.options.askForConfirmation = true;
+	  }
+
+	  processedCount() {
+	    return this.state.delCount + this.state.failCount + this.state.skipCount;
+	  }
+
+	  cancelInFlightRequest() {
+	    try { this._activeRequestController?.abort(); } catch {}
+	    this._activeRequestController = null;
+	  }
+
+	  beginAbortableRequest() {
+	    this.cancelInFlightRequest();
+	    const controller = new AbortController();
+	    this._activeRequestController = controller;
+	    return controller;
+	  }
+
+	  endAbortableRequest(controller) {
+	    if (this._activeRequestController === controller) this._activeRequestController = null;
+	  }
+
+	  cancelPendingWait() {
+	    if (!this._pendingWait) return;
+	    const { timer, resolve } = this._pendingWait;
+	    this._pendingWait = null;
+	    try { clearTimeout(timer); } catch {}
+	    try { resolve(); } catch {}
+	  }
+
+	  networkRetryDelayMs(attempt) {
+	    const base = this.options.networkRetryBaseDelay ?? 1000;
+	    return Math.min(30000, base * Math.pow(1.6, attempt - 1)) + Math.floor(Math.random() * 250);
+	  }
+
+	  messageMatchesLocalHistoryFilters(message) {
+	    if (!message) return false;
+	    if (this.options.authorId && String(message?.author?.id || '') !== String(this.options.authorId)) return false;
+	    if (this.options.minId) {
+	      const minSnow = String(toSnowflake(this.options.minId));
+	      if (BigInt(message.id) <= BigInt(minSnow)) return false;
+	    }
+	    if (this.options.maxId) {
+	      const maxSnow = String(toSnowflake(this.options.maxId));
+	      if (BigInt(message.id) >= BigInt(maxSnow)) return false;
+	    }
+	    const content = String(message.content || '');
+	    if (this.options.content && !content.toLowerCase().includes(String(this.options.content).toLowerCase())) return false;
+	    if (this.options.hasFile && !(Array.isArray(message.attachments) && message.attachments.length > 0)) return false;
+	    if (this.options.hasLink && !/(https?:\/\/[^\s]+)/i.test(content)) return false;
+	    return true;
+	  }
+
+	  async searchByHistoryScan() {
+	    const channelId = String(this.options.channelId || '').trim();
+	    if (!channelId) {
+	      this.state._seachResponse = { messages: [], total_results: 0 };
+	      return this.state._seachResponse;
+	    }
+
+	    const params = [['limit', '100']];
+	    if (this.state._historyBeforeId) params.push(['before', this.state._historyBeforeId]);
+	    const url = `https://discord.com/api/v9/channels/${channelId}/messages?${queryString(params)}`;
+
+	    let resp;
+	    let networkAttempt = 0;
+	    while (true) {
+	      try {
+	        const reqCtl = this.beginAbortableRequest();
+	        this.beforeRequest();
+	        resp = await fetch(url, {
+	          headers: { Authorization: this.options.authToken },
+	          signal: reqCtl.signal,
+	        });
+	        this.endAbortableRequest(reqCtl);
+	        this.afterRequest();
+	        break;
+	      } catch (err) {
+	        if (err?.name === 'AbortError' && !this.state.running) throw err;
+	        if (!this.state.running) throw err;
+	        if (!this.options.retryOnNetworkError) {
+	          this.state.running = false;
+	          log.error('History scan request threw an error:', err);
+	          throw err;
+	        }
+	        networkAttempt++;
+	        if (networkAttempt > (this.options.maxNetworkRetries ?? 8)) {
+	          this.state.running = false;
+	          log.error(`History scan failed after ${this.options.maxNetworkRetries} network retries.`, err);
+	          throw err;
+	        }
+	        const delay = this.networkRetryDelayMs(networkAttempt);
+	        log.warn(`Network error on history scan (${networkAttempt}/${this.options.maxNetworkRetries}). Retrying in ${Math.round(delay)}ms…`, String(err?.message || err));
+	        if (!await this.interruptibleWait(delay)) throw err;
+	      }
+	    }
+
+	    if (!resp.ok) {
+	      if (resp.status === 429) {
+	        let w = (await resp.json()).retry_after * 1000;
+	        w = w || this.options.searchDelay;
+	        this.stats.throttledCount++;
+	        this.stats.throttledTotalTime += w;
+	        log.warn(`History scan rate-limited for ${(w / 1000).toFixed(1)}s. Retrying…`);
+	        if (!await this.interruptibleWait(w)) return;
+	        return await this.searchByHistoryScan();
+	      }
+	      this.state.running = false;
+	      log.error(`History scan failed with status ${resp.status}`, await resp.text());
+	      throw resp;
+	    }
+
+	    const batch = await resp.json();
+	    const list = Array.isArray(batch) ? batch : [];
+	    if (list.length > 0) this.state._historyBeforeId = String(list[list.length - 1].id);
+	    else this.state._historyExhausted = true;
+
+	    const matched = list.filter(m => this.messageMatchesLocalHistoryFilters(m));
+	    const groups = matched.map(m => [{ ...m, hit: true }]);
+	    const data = {
+	      messages: groups,
+	      total_results: this.state.grandTotal + matched.length,
+	      __undiscord_history_scan: true,
+	    };
+	    this.state._seachResponse = data;
+	    if (this.options.verboseLog) {
+	      log.verb(`History scan: fetched ${list.length}, matched ${matched.length}, exhausted=${this.state._historyExhausted ? 'yes' : 'no'}`);
+	    }
+	    return data;
+	  }
+
+	  /** Re-check after a delete batch — finish early when search index is caught up */
+	  async quickCheckIfDone() {
+	    const oldOffset = this.state.offset;
+	    const oldHistoryBefore = this.state._historyBeforeId;
+	    try {
+	      this.state.offset = 0;
+	      if (this.state._historyScanActive) this.state._historyBeforeId = null;
+	      await this.search();
+	      await this.filterResponse();
+	      const hasMore = this.state._messagesToDelete.length > 0 || this.state._skippedMessages.length > 0;
+	      const processed = this.processedCount();
+	      const target = this.state.grandTotal || 0;
+	      if (!hasMore) {
+	        if (target > 0 && processed < target) {
+	          log.warn(`Quick check looked empty but only processed ${processed}/${target}. Continuing…`);
+	          return false;
+	        }
+	        if (this.options.verboseLog) log.verb('Quick check: no more messages. Finishing.');
+	        this.state.running = false;
+	        return true;
+	      }
+	      return false;
+	    } catch (e) {
+	      log.warn('Quick check failed, continuing normally…', e);
+	      return false;
+	    } finally {
+	      this.state.offset = oldOffset;
+	      if (this.state._historyScanActive) this.state._historyBeforeId = oldHistoryBefore;
+	    }
 	  }
 
 	  /** Pick an honest completion line (e.g. pinned left when filter is off) */
@@ -1072,12 +1251,18 @@
 
 	  /** Sleep in small steps so Stop can break out without waiting the full delay */
 	  async interruptibleWait(ms) {
-	    const step = 250;
-	    for (let elapsed = 0; elapsed < ms; elapsed += step) {
-	      if (!this.state.running) return false;
-	      await wait(Math.min(step, ms - elapsed));
-	    }
-	    return this.state.running;
+	    const waitMs = Math.max(0, Number(ms) || 0);
+	    if (waitMs === 0) return this.state.running;
+	    return new Promise((resolve) => {
+	      const timer = setTimeout(() => {
+	        if (this._pendingWait?.timer === timer) this._pendingWait = null;
+	        resolve(this.state.running);
+	      }, waitMs);
+	      this._pendingWait = {
+	        timer,
+	        resolve: () => resolve(this.state.running),
+	      };
+	    });
 	  }
 
 	  /** Always run once when a job ends — natural finish or Stop */
@@ -1104,6 +1289,9 @@
 	        ? `, ${this.state.pinnedSkipCount} pinned skipped`
 	        : '';
 	      log.info(`Summary: ${delCount} deleted, ${failCount} failed, ${skipCount} skipped${pinnedNote} (${grandTotal} reported by Discord).`);
+	    }
+	    if (this.stats.throttledCount > 0) {
+	      log.info(`Rate limits: ${this.stats.throttledCount}×, total wait ${msToHMS(this.stats.throttledTotalTime)}.`);
 	    }
 
 	    log.success(`Finished at ${this.stats.endTime.toLocaleString()} (${elapsed})`);
@@ -1161,7 +1349,17 @@
 	        }
 
 	        await this.deleteMessagesFromList();
+
+	        const doneNow = await this.quickCheckIfDone();
+	        if (doneNow) {
+	          this.logSummary(this.completionMessage());
+	          console.log(PREFIX$1, '[End state]', this.state);
+	          if (isJob) break;
+	          break;
+	        }
+
 	        this.state.emptyPageRetryCount = 0;
+	        this.state._emptyPageStreak = 0;
 
 	        if (this.isComplete()) {
 	          this.logSummary(this.completionMessage());
@@ -1195,6 +1393,7 @@
 	          this.state.offset += skipped;
 	        }
 	        this.state.emptyPageRetryCount = 0;
+	        this.state._emptyPageStreak = 0;
 
 	        if (this.isComplete()) {
 	          this.logSummary(this.completionMessage());
@@ -1204,16 +1403,48 @@
 	        }
 	      }
 	      else {
-	        const pastResults = this.state.grandTotal > 0 && this.state.offset >= this.state.grandTotal;
+	        const processed = this.processedCount();
+	        const target = this.state.grandTotal || 0;
+	        const rawCount = Number(this.state._rawDiscoveredCount || 0);
 
-	        if (this.isComplete() || pastResults) {
+	        if (this.state._historyScanActive && this.state._historyExhausted && rawCount === 0) {
+	          if (target > processed) {
+	            log.warn(`History scan exhausted (${processed}/${target} processed). Ending to avoid empty-page waits.`);
+	          }
+	          this.logSummary(target > processed ? END_MSG.EMPTY_EXHAUSTED : this.completionMessage());
+	          console.log(PREFIX$1, '[End state]', this.state);
+	          if (isJob) break;
+	          this.state.running = false;
+	          continue;
+	        }
+
+	        if (this.state._forcedChannelFilterActive && rawCount > 0) {
+	          const pageCount = Number(this.state._seachResponse?.messages?.length || 0);
+	          if (pageCount > 0) {
+	            this.state.offset += pageCount;
+	            if (this.options.verboseLog) log.verb(`No hits for target channel on this guild page; offset → ${this.state.offset}`);
+	            if (this.state.running) await this.interruptibleWait(this.options.searchDelay);
+	            continue;
+	          }
+	        }
+
+	        const pastResults = target > 0 && this.state.offset >= target;
+
+	        if (this.isComplete() || (pastResults && processed >= target)) {
 	          this.logSummary(this.state.grandTotal === 0 ? END_MSG.NO_MATCHES : END_MSG.EMPTY_END);
 	          console.log(PREFIX$1, '[End state]', this.state);
 	          if (isJob) break;
 	          this.state.running = false;
-	        } else if (this.state.emptyPageRetryCount < this.options.emptyPageRetries) {
-	          this.state.emptyPageRetryCount++;
-	          log.warn(`Empty page from Discord — retrying (${this.state.emptyPageRetryCount}/${this.options.emptyPageRetries})…`);
+	        } else if (target > 0 && processed < target && this.state._emptyPageStreak < this.options.emptyPageRetries) {
+	          this.state._emptyPageStreak++;
+	          this.state.emptyPageRetryCount = this.state._emptyPageStreak;
+	          const waitMs = Math.max(250, Number(this.options.searchDelay) || 0);
+	          log.warn(`Empty page (${processed}/${target}) — retry ${this.state._emptyPageStreak}/${this.options.emptyPageRetries} in ${Math.round(waitMs / 1000)}s…`);
+	          if (this.state.running) await this.interruptibleWait(waitMs);
+	        } else if (target === 0 && this.state._emptyPageStreak < this.options.emptyPageRetries) {
+	          this.state._emptyPageStreak++;
+	          log.warn(`Empty page — retry ${this.state._emptyPageStreak}/${this.options.emptyPageRetries}…`);
+	          if (this.state.running) await this.interruptibleWait(this.options.searchDelay);
 	        } else {
 	          this.logSummary(END_MSG.EMPTY_EXHAUSTED);
 	          console.log(PREFIX$1, '[End state]', this.state);
@@ -1242,6 +1473,8 @@
 	    if (!this.state.running && this._runFinished) return;
 	    this._userStopped = true;
 	    this.state.running = false;
+	    this.cancelPendingWait();
+	    this.cancelInFlightRequest();
 	    if (!this._runFinished) log.warn('Stop requested — finishing current request…');
 	  }
 
@@ -1276,80 +1509,157 @@
 	  }
 
 	  async search() {
-	    let API_SEARCH_URL;
-	    if (this.options.guildId === '@me') API_SEARCH_URL = `https://discord.com/api/v9/channels/${this.options.channelId}/messages/`; // DMs
-	    else API_SEARCH_URL = `https://discord.com/api/v9/guilds/${this.options.guildId}/messages/`; // Server
+	    if (this.state._historyScanActive) return await this.searchByHistoryScan();
+
+	    const hasChannelScope = !!this.options.channelId;
+	    const canFallbackToGuildScope = hasChannelScope && this.options.guildId !== '@me';
+	    let scope = hasChannelScope ? 'channel' : 'guild';
+	    let allowGuildChannelFilter = true;
+	    let triedGuildAfterEmptyChannel = false;
+	    let triedGuildWithoutChannelFilter = false;
 
 	    let resp;
-	    try {
-	      this.beforeRequest();
-	      resp = await fetch(API_SEARCH_URL + 'search?' + queryString([
-	        ['author_id', this.options.authorId || undefined],
-	        ['channel_id', (this.options.guildId !== '@me' ? this.options.channelId : undefined) || undefined],
-	        ['min_id', this.options.minId ? toSnowflake(this.options.minId) : undefined],
-	        ['max_id', this.options.maxId ? toSnowflake(this.options.maxId) : undefined],
-	        ['sort_by', 'timestamp'],
-	        ['sort_order', 'desc'],
-	        ['offset', this.state.offset],
-	        ['has', this.options.hasLink ? 'link' : undefined],
-	        ['has', this.options.hasFile ? 'file' : undefined],
-	        ['content', this.options.content || undefined],
-	        ['include_nsfw', this.options.includeNsfw ? true : undefined],
-	      ]), {
-	        headers: {
-	          'Authorization': this.options.authToken,
+	    let networkAttempt = 0;
+
+	    while (true) {
+	      try {
+	        const useGuildScope = scope === 'guild';
+	        const API_SEARCH_URL = useGuildScope
+	          ? `https://discord.com/api/v9/guilds/${this.options.guildId}/messages/`
+	          : `https://discord.com/api/v9/channels/${this.options.channelId}/messages/`;
+	        const queryChannelId = (useGuildScope && allowGuildChannelFilter) ? this.options.channelId : undefined;
+	        const reqCtl = this.beginAbortableRequest();
+	        this.beforeRequest();
+	        resp = await fetch(API_SEARCH_URL + 'search?' + queryString([
+	          ['author_id', this.options.authorId || undefined],
+	          ['channel_id', queryChannelId],
+	          ['min_id', this.options.minId ? toSnowflake(this.options.minId) : undefined],
+	          ['max_id', this.options.maxId ? toSnowflake(this.options.maxId) : undefined],
+	          ['sort_by', 'timestamp'],
+	          ['sort_order', 'desc'],
+	          ['offset', this.state.offset],
+	          ['has', this.options.hasLink ? 'link' : undefined],
+	          ['has', this.options.hasFile ? 'file' : undefined],
+	          ['content', this.options.content || undefined],
+	          ['include_nsfw', this.options.includeNsfw ? true : undefined],
+	        ]), {
+	          headers: { Authorization: this.options.authToken },
+	          signal: reqCtl.signal,
+	        });
+	        this.endAbortableRequest(reqCtl);
+	        this.afterRequest();
+
+	        if (resp.status === 400 && canFallbackToGuildScope && scope === 'channel') {
+	          const body = await resp.clone().json().catch(() => null);
+	          if (body?.code === 50024) {
+	            log.warn('Channel search not supported here — switching to channel history scan…');
+	            this.state._historyScanActive = true;
+	            this.state._historyBeforeId = null;
+	            this.state._historyExhausted = false;
+	            return await this.searchByHistoryScan();
+	          }
 	        }
-	      });
-	      this.afterRequest();
-	    } catch (err) {
-	      this.state.running = false;
-	      log.error('Search request threw an error:', err);
-	      throw err;
+
+	        if (resp.status === 400 && canFallbackToGuildScope && scope === 'guild' && allowGuildChannelFilter) {
+	          const body = await resp.clone().json().catch(() => null);
+	          if (body?.code === 50024) {
+	            log.warn('Guild search rejected channel filter — retrying with local channel filter…');
+	            allowGuildChannelFilter = false;
+	            continue;
+	          }
+	        }
+
+	        if (resp.ok && canFallbackToGuildScope && scope === 'channel' && !triedGuildAfterEmptyChannel) {
+	          const body = await resp.clone().json().catch(() => null);
+	          if (Number(body?.total_results ?? -1) === 0) {
+	            triedGuildAfterEmptyChannel = true;
+	            scope = 'guild';
+	            allowGuildChannelFilter = true;
+	            log.warn('Channel search returned 0 — probing guild search…');
+	            continue;
+	          }
+	        }
+
+	        if (resp.ok && canFallbackToGuildScope && scope === 'guild' && allowGuildChannelFilter && !triedGuildWithoutChannelFilter) {
+	          const body = await resp.clone().json().catch(() => null);
+	          if (Number(body?.total_results ?? -1) === 0) {
+	            triedGuildWithoutChannelFilter = true;
+	            allowGuildChannelFilter = false;
+	            log.warn('Guild search with channel filter returned 0 — probing without filter (local filter ON)…');
+	            continue;
+	          }
+	        }
+
+	        break;
+	      } catch (err) {
+	        if (err?.name === 'AbortError' && !this.state.running) throw err;
+	        if (!this.state.running) throw err;
+	        if (!this.options.retryOnNetworkError) {
+	          this.state.running = false;
+	          log.error('Search request threw an error:', err);
+	          throw err;
+	        }
+	        networkAttempt++;
+	        if (networkAttempt > (this.options.maxNetworkRetries ?? 8)) {
+	          this.state.running = false;
+	          log.error(`Search failed after ${this.options.maxNetworkRetries} network retries.`, err);
+	          throw err;
+	        }
+	        const delay = this.networkRetryDelayMs(networkAttempt);
+	        log.warn(`Network error on search (${networkAttempt}/${this.options.maxNetworkRetries}). Retrying in ${Math.round(delay)}ms…`, String(err?.message || err));
+	        if (!await this.interruptibleWait(delay)) throw err;
+	      }
 	    }
 
-	    // not indexed yet
 	    if (resp.status === 202) {
 	      let w = (await resp.json()).retry_after * 1000;
-	      w = w || this.stats.searchDelay; // Fix retry_after 0
+	      w = w || this.stats.searchDelay;
 	      this.stats.throttledCount++;
 	      this.stats.throttledTotalTime += w;
-	      log.warn(`This channel isn't indexed yet. Waiting ${w}ms for discord to index it...`);
+	      log.warn(`This channel isn't indexed yet. Waiting ${(w / 1000).toFixed(1)}s…`);
 	      if (!await this.interruptibleWait(w)) return;
 	      if (!this.state.running) return;
 	      return await this.search();
 	    }
 
 	    if (!resp.ok) {
-	      // searching messages too fast
 	      if (resp.status === 429) {
 	        let w = (await resp.json()).retry_after * 1000;
-	        w = w || this.stats.searchDelay; // Fix retry_after 0
-
+	        w = w || this.stats.searchDelay;
 	        this.stats.throttledCount++;
 	        this.stats.throttledTotalTime += w;
-	        this.stats.searchDelay += w; // increase delay
-	        w = this.stats.searchDelay;
-	        log.warn(`Being rate limited by the API for ${w}ms! Increasing search delay...`);
+	        this.options.searchDelay += w;
+	        w = this.options.searchDelay;
+	        log.warn(`Search rate limited for ${(w / 1000).toFixed(1)}s! Increasing search delay…`);
 	        this.printStats();
-	        log.verb(`Cooling down for ${w * 2}ms before retrying...`);
-
 	        if (!await this.interruptibleWait(w * 2)) return;
 	        if (!this.state.running) return;
 	        return await this.search();
 	      }
-	      else if (resp.status === 403) {
-	        // Insufficient permissions for this channel/guild search — PR #740
-	        log.warn('Search returned 403 (insufficient permissions). Treating as empty and continuing.', await resp.json());
-	        this.state._seachResponse = { messages: [] };
+	      if (resp.status === 403) {
+	        log.warn('Search returned 403 (insufficient permissions). Treating as empty.');
+	        this.state._seachResponse = { messages: [], total_results: 0 };
 	        return this.state._seachResponse;
 	      }
-	      else {
-	        this.state.running = false;
-	        log.error(`Error searching messages, API responded with status ${resp.status}!\n`, await resp.json());
-	        throw resp;
+	      if (resp.status >= 500 && resp.status <= 599 && this.options.retryOnNetworkError) {
+	        networkAttempt++;
+	        if (networkAttempt <= (this.options.maxNetworkRetries ?? 8)) {
+	          const delay = this.networkRetryDelayMs(networkAttempt);
+	          log.warn(`Search server error ${resp.status}. Retrying in ${Math.round(delay)}ms…`);
+	          if (!await this.interruptibleWait(delay)) return;
+	          return await this.search();
+	        }
 	      }
+	      this.state.running = false;
+	      const errBody = await resp.text().catch(() => '');
+	      log.error(`Error searching messages, API responded with status ${resp.status}!`, errBody);
+	      throw resp;
 	    }
+
 	    const data = await resp.json();
+	    if (scope === 'guild' && !allowGuildChannelFilter && this.options.channelId) {
+	      data.__undiscord_forceChannelId = String(this.options.channelId);
+	    }
 	    this.state._seachResponse = data;
 	    console.log(PREFIX$1, 'search', data);
 	    return data;
@@ -1358,14 +1668,20 @@
 	  async filterResponse() {
 	    const data = this.state._seachResponse;
 
-	    // the search total will decrease as we delete stuff
 	    const total = data.total_results;
-	    if (total > this.state.grandTotal) this.state.grandTotal = total;
+	    const forceChannelId = String(data?.__undiscord_forceChannelId || '').trim();
+	    this.state._forcedChannelFilterActive = !!forceChannelId;
+	    if (!forceChannelId && total > this.state.grandTotal) this.state.grandTotal = total;
 
-	    // search returns messages near the the actual message, only get the messages we searched for.
-	    const discoveredMessages = data.messages
-	      .map(convo => convo.find(message => message?.hit === true))
+	    const discoveredMessagesRaw = (Array.isArray(data.messages) ? data.messages : [])
+	      .map(convo => (Array.isArray(convo) ? convo.find(message => message?.hit === true) : null))
 	      .filter(Boolean);
+	    this.state._rawDiscoveredCount = discoveredMessagesRaw.length;
+
+	    let discoveredMessages = discoveredMessagesRaw;
+	    if (forceChannelId) {
+	      discoveredMessages = discoveredMessagesRaw.filter(msg => String(msg?.channel_id || '') === forceChannelId);
+	    }
 
 	    // we can only delete some types of messages, system messages are not deletable.
 	    // type 46 = polls (self-deletable) — PR #741
@@ -1436,61 +1752,82 @@
 
 	  async deleteMessage(message) {
 	    const API_DELETE_URL = `https://discord.com/api/v9/channels/${message.channel_id}/messages/${message.id}`;
-	    let resp;
-	    try {
-	      this.beforeRequest();
-	      resp = await fetch(API_DELETE_URL, {
-	        method: 'DELETE',
-	        headers: {
-	          'Authorization': this.options.authToken,
-	        },
-	      });
-	      this.afterRequest();
-	    } catch (err) {
-	      // no response error (e.g. network error)
-	      log.error('Delete request throwed an error:', err);
-	      log.verb('Related object:', redact(JSON.stringify(message)));
-	      return 'FAILED';
-	    }
+	    let networkAttempt = 0;
 
-	    if (!resp.ok) {
-	      if (resp.status === 429) {
-	        // deleting messages too fast
-	        const w = (await resp.json()).retry_after * 1000;
-	        this.stats.throttledCount++;
-	        this.stats.throttledTotalTime += w;
-	        this.options.deleteDelay = w; // increase delay
-	        log.warn(`Being rate limited by the API for ${(w / 1000).toFixed(1)}s! Adjusted delete delay to ${formatDelaySeconds(this.options.deleteDelay)}s.`);
-	        this.printStats();
-	        log.verb(`Cooling down for ${w * 2}ms before retrying...`);
-	        if (!await this.interruptibleWait(w * 2)) return 'FAILED';
-	        return 'RETRY';
-	      } else {
+	    deleteAttempt: while (true) {
+	      let resp;
+	      try {
+	        const reqCtl = this.beginAbortableRequest();
+	        this.beforeRequest();
+	        resp = await fetch(API_DELETE_URL, {
+	          method: 'DELETE',
+	          headers: { Authorization: this.options.authToken },
+	          signal: reqCtl.signal,
+	        });
+	        this.endAbortableRequest(reqCtl);
+	        this.afterRequest();
+	      } catch (err) {
+	        if (err?.name === 'AbortError' && !this.state.running) return 'FAILED';
+	        if (!this.options.retryOnNetworkError) {
+	          log.error('Delete request threw an error:', err);
+	          log.verb('Related object:', redact(JSON.stringify(message)));
+	          return 'FAILED';
+	        }
+	        networkAttempt++;
+	        if (networkAttempt > (this.options.maxNetworkRetries ?? 8)) {
+	          log.error(`Delete failed after ${this.options.maxNetworkRetries} network retries.`, err);
+	          return 'FAILED';
+	        }
+	        const delay = this.networkRetryDelayMs(networkAttempt);
+	        log.warn(`Network error on delete (${networkAttempt}/${this.options.maxNetworkRetries}). Retrying in ${Math.round(delay)}ms…`);
+	        if (!await this.interruptibleWait(delay)) return 'FAILED';
+	        continue deleteAttempt;
+	      }
+
+	      if (!resp.ok) {
+	        if (resp.status === 429) {
+	          const w = (await resp.json()).retry_after * 1000;
+	          this.stats.throttledCount++;
+	          this.stats.throttledTotalTime += w;
+	          this.options.deleteDelay = w;
+	          log.warn(`Delete rate limited for ${(w / 1000).toFixed(1)}s! Adjusted delete delay to ${formatDelaySeconds(this.options.deleteDelay)}s.`);
+	          this.printStats();
+	          if (!await this.interruptibleWait(w * 2)) return 'FAILED';
+	          return 'RETRY';
+	        }
+
 	        const body = await resp.text();
+	        if (resp.status >= 500 && resp.status <= 599 && this.options.retryOnNetworkError) {
+	          networkAttempt++;
+	          if (networkAttempt <= (this.options.maxNetworkRetries ?? 8)) {
+	            const delay = this.networkRetryDelayMs(networkAttempt);
+	            log.warn(`Delete server error ${resp.status}. Retrying in ${Math.round(delay)}ms…`);
+	            if (!await this.interruptibleWait(delay)) return 'FAILED';
+	            continue deleteAttempt;
+	          }
+	          log.error(`Delete failed — server error ${resp.status}.`, body.slice(0, 200));
+	          return 'FAILED';
+	        }
 
 	        try {
 	          const r = JSON.parse(body);
-
 	          if (resp.status === 400 && r.code === 50083) {
-	            // 400 can happen if the thread is archived (code=50083)
-	            // in this case we need to "skip" this message from the next search
-	            // otherwise it will come up again in the next page (and fail to delete again)
-	            log.warn('Error deleting message (Thread is archived). Will increment offset so we don\'t search this in the next page...');
+	            log.warn('Thread is archived — skipping this message on future searches.');
 	            this.state.offset++;
-	            return 'FAIL_SKIP'; // Failed but we will skip it next time
+	            return 'FAIL_SKIP';
 	          }
-
 	          log.error(`Error deleting message, API responded with status ${resp.status}!`, r);
 	          log.verb('Related object:', redact(JSON.stringify(message)));
 	          return 'FAILED';
 	        } catch (e) {
-	          log.error(`Fail to parse JSON. API responded with status ${resp.status}!`, body);
+	          log.error(`Delete failed — API status ${resp.status} (non-JSON response).`, body.slice(0, 200));
+	          return 'FAILED';
 	        }
 	      }
-	    }
 
-	    this.state.delCount++;
-	    return 'OK';
+	      this.state.delCount++;
+	      return 'OK';
+	    }
 	  }
 
 	  #beforeTs = 0; // used to calculate latency

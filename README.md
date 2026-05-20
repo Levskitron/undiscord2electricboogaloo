@@ -7,14 +7,25 @@ An overhauled, maintained fork of [Undiscord](https://github.com/victornpb/undis
 
 The original Undiscord project has been largely inactive for months, with [dozens of open issues and pull requests](https://github.com/victornpb/undiscord/issues) and a UI that no longer matches Discord’s current layout. **Undiscord 2: Electric Boogaloo** keeps the same core workflow while fixing styling, toolbar integration, and the kinds of papercuts that piled up upstream.
 
+## Privacy
+
+This script runs **only in your browser** on Discord. It does not send your messages, token, or chat history to us or any third-party service — network traffic for deletion goes to **Discord’s API** only.
+
+We still want you to be comfortable before you run it:
+
+- Read **[PRIVACY.md](./PRIVACY.md)** for a plain breakdown of what the script touches and what it does *not* do (no harvesting, no token stealing, no malware).
+- **Audit the source** yourself: everything lives in one file, [`undiscord-electric-boogaloo.user.js`](./undiscord-electric-boogaloo.user.js). We encourage going through it piece by piece until you are satisfied.
+
+What you delete, and what filters you use, is **your business**. This project is a tool you operate locally — not a service that collects your data.
+
 ## Features
 
 - **Bulk message deletion** — search and delete your messages in a server channel or DM, with progress and time estimates.
 - **Rich filtering** — text search, `has: link` / `has: file`, regex patterns, pinned messages, message ID ranges, and date ranges.
 - **Batch jobs** — comma-separated channel IDs, or import `messages/index.json` from a [Discord data export](https://support.discord.com/hc/en-us/articles/360004957031) to wipe many channels at once.
-- **Rate-limit aware** — adjusts search and delete delays when Discord throttles requests.
-- **Modern UI** — Discord-dark theme, draggable/resizable window, sidebar toggle, in-panel logging, and privacy mode to mask sensitive fields and log lines.
-- **Up-to-date Discord integration** — toolbar button mounts on current Discord class names and re-attaches when the client re-renders.
+- **Rate-limit aware** — adjusts search and delete delays when Discord throttles requests; configurable empty-page retries for long runs.
+- **Modern UI** — Discord-dark theme, draggable/resizable window, sidebar sections, in-panel logging, and privacy mode to mask sensitive fields and log lines.
+- **Up-to-date Discord integration** — toolbar button with resilient mount and re-attach when the client re-renders.
 
 ## Requirements
 
@@ -41,8 +52,8 @@ Copy the contents of [`undiscord-electric-boogaloo.user.js`](./undiscord-electri
 
 1. Navigate to the server or DM whose messages you want to clean up.
 2. Open the Undiscord panel from the toolbar button.
-3. Fill in **Author ID** (use **me**), **Server ID** (**current**), and **Channel ID** (**current**), or set them manually.
-4. Optionally configure filters, date/message intervals, or import a Discord export under **Wipe Archive**.
+3. Fill in **Author ID** (use **Me**), **Server ID** (**Current**), and **Channel ID** (**Current**), or set them manually.
+4. Optionally configure filters, limits, **Bulk archive** import, or **Advanced** timing and retries.
 5. Click **Delete** and confirm the estimated count. Use **Stop** to cancel.
 
 For field-by-field help, the in-app links point to the [original Undiscord wiki](https://github.com/victornpb/undiscord/wiki).
@@ -50,8 +61,9 @@ For field-by-field help, the in-app links point to the [original Undiscord wiki]
 ### Tips
 
 - Start with conservative **search** and **delete** delays if you hit rate limits; the script will increase delays automatically when throttled.
+- For very large jobs, raise **Empty page retries** (Advanced) if the run stops early while matches remain.
 - Use **Privacy mode** before sharing your screen — it masks tokens, IDs, and deletion log content (toggle anytime).
-- Deleting large histories can take a long time; keep the tab open until the run finishes.
+- Deleting large histories can take a long time; keep the Discord tab open until the run finishes.
 
 ## Why this fork?
 
@@ -60,12 +72,15 @@ For field-by-field help, the in-app links point to the [original Undiscord wiki]
 | Maintenance | Stale; many unresolved issues/PRs | Active fixes and UI upkeep |
 | Discord UI | Broken/outdated styling and layout | Theme aligned with current Discord |
 | Toolbar button | Often missing after Discord updates | Resilient mount + observer re-attach |
+| Long runs | Often stopped on transient empty search pages | Configurable empty-page retries |
 
 This repository is not affiliated with Discord Inc. or the original Undiscord maintainers.
 
 ## Disclaimer
 
 Using automation against Discord’s API may violate the [Discord Terms of Service](https://discord.com/terms). You are responsible for how you use this script. It only deletes messages **you** have permission to delete (typically your own). There is no warranty — see the license below.
+
+For how data is handled in the browser, see **[PRIVACY.md](./PRIVACY.md)**.
 
 ## Contributing
 

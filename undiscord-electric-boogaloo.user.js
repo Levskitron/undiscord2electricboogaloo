@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Undiscord 2: Electric Boogaloo
 // @description     Versatile Undiscord fork — fast bulk wipe or interactive media backup & delete.
-// @version         1.1.0
+// @version         1.2.0
 // @author          Levskitron
 // @homepageURL     https://github.com/Levskitron/undiscord2electricboogaloo
 // @supportURL      https://github.com/Levskitron/undiscord2electricboogaloo/issues
@@ -16,7 +16,7 @@
 	'use strict';
 
 	/* rollup-plugin-baked-env */
-	const VERSION = '1.1.0';
+	const VERSION = '1.2.0';
 	const TOOL_NAME = 'Undiscord 2: Electric Boogaloo';
 	const WINDOW_WIDTH = 960;
 
@@ -725,6 +725,7 @@
                                     <option value="fastWipe" selected>Fast wipe (default)</option>
                                     <option value="carefulWipe">Careful wipe</option>
                                     <option value="mediaCurator">Review photos &amp; backup</option>
+                                    <option value="serverWipe">Server wipe (all channels)</option>
                                     <option value="custom">Custom</option>
                                 </select>
                             </div>
@@ -778,11 +779,19 @@
                                 </div>
                                 <button type="button" class="field-btn" id="getChannel">Current</button>
                             </div>
-                            <p class="field-hint">Use commas for multiple channels. Import a Discord export below for batch wipes.</p>
+                            <p class="field-hint">Use commas for multiple channels, or enable server-wide wipe below.</p>
                             <div class="check-list">
+                                <label title="Discover every text channel, thread, and forum in this server via API (and sidebar fallback)">
+                                    <input id="deleteAllChannels" type="checkbox">
+                                    <span>All message channels in this server</span>
+                                </label>
                                 <label title="Required for Discord to return messages from age-restricted channels when searching a server">
                                     <input id="includeNsfw" type="checkbox">
                                     <span>Include NSFW channels (server search only)</span>
+                                </label>
+                                <label title="When you switch channels in Discord, refresh Server/Channel IDs in the form">
+                                    <input id="autofillOnNavigate" type="checkbox" checked>
+                                    <span>Auto-fill IDs when I change channel</span>
                                 </label>
                             </div>
                         </div>
@@ -950,6 +959,10 @@
                             <label title="Only applies to Fast wipe and Custom with Direct pipeline">
                                 <input id="askConfirmation" type="checkbox">
                                 <span>Confirm before first delete batch</span>
+                            </label>
+                            <label title="When delete fails because a thread is archived, temporarily unarchive it and retry (re-archives when empty)">
+                                <input id="unarchiveThreads" type="checkbox">
+                                <span>Unarchive threads before delete</span>
                             </label>
                         </div>
                         <div class="field">
@@ -1138,6 +1151,16 @@
 	    emptyPageRetries: 2,
 	    showMediaSection: true,
 	  },
+	  serverWipe: {
+	    hint: 'Finds all text channels and threads in the server, then deletes from each one by one. Use high delete delay.',
+	    pipeline: 'direct',
+	    deleteAllChannels: true,
+	    askForConfirmation: true,
+	    searchDelayMs: 30000,
+	    deleteDelayMs: 1500,
+	    emptyPageRetries: 3,
+	    showMediaSection: false,
+	  },
 	  custom: {
 	    hint: 'You control pipeline and timing. Expand Media review if using interactive mode.',
 	    showMediaSection: true,
@@ -1197,6 +1220,7 @@
 	    skipPinned: false,
 	    serverName: 'Server',
 	    channelName: 'Channel',
+	    unarchiveThreads: false,
 	  };
 
 	  state = {
@@ -1219,6 +1243,10 @@
 	    _historyExhausted: false,
 	    _rawDiscoveredCount: 0,
 	    _forcedChannelFilterActive: false,
+	    _batchActive: false,
+	    _batchIndex: 0,
+	    _batchTotal: 0,
+	    _avgDeletePerPage: 25,
 	  };
 
 	  stats = {
@@ -1228,6 +1256,8 @@
 	    lastPing: null, // the most recent ping
 	    avgPing: null, // average ping used to calculate the estimated remaining time
 	    etr: 0,
+	    _etrLastUpdateTs: 0,
+	    pendingWaitUntilTs: 0,
 	  };
 
 	  // events
@@ -1262,6 +1292,10 @@
 	      _historyExhausted: false,
 	      _rawDiscoveredCount: 0,
 	      _forcedChannelFilterActive: false,
+	      _batchActive: false,
+	      _batchIndex: 0,
+	      _batchTotal: 0,
+	      _avgDeletePerPage: 25,
 	    };
 
 	    this._skipHintShown = false;
@@ -1477,26 +1511,35 @@
 	  async runBatch(queue) {
 	    if (this.state.running) return log.error('Already running!');
 
-	    log.info(`Runnning batch with queue of ${queue.length} jobs`);
+	    log.info(`Running batch with ${queue.length} channel job(s)…`);
+	    this.state._batchActive = true;
+	    this.state._batchTotal = queue.length;
+
 	    for (let i = 0; i < queue.length; i++) {
 	      const job = queue[i];
-	      log.info('Starting job...', `(${i + 1}/${queue.length})`);
+	      this.state._batchIndex = i + 1;
+	      const label = job.channelName ? `#${job.channelName}` : String(job.channelId || '');
+	      log.info(`Channel ${i + 1}/${queue.length}${label ? ` — ${label}` : ''}`);
 
-	      // set options
 	      this.options = {
-	        ...this.options, // keep current options
-	        ...job, // override with options for that job
+	        ...this.options,
+	        ...job,
+	        channelName: job.channelName || this.options.channelName,
 	      };
 
 	      await this.run(true);
 	      if (!this.state.running) break;
 
-	      log.info('Job ended.', `(${i + 1}/${queue.length})`);
+	      log.info(`Channel job finished (${i + 1}/${queue.length}).`);
 	      this.resetState();
 	      this.options.askForConfirmation = false;
-	      this.state.running = true; // continue running
+	      this.state.running = true;
+	      this.state._batchActive = true;
+	      this.state._batchTotal = queue.length;
+	      this.state._batchIndex = i + 1;
 	    }
 
+	    this.state._batchActive = false;
 	    log.info('Batch finished.');
 	    this.state.running = false;
 	  }
@@ -1505,9 +1548,13 @@
 	  async interruptibleWait(ms) {
 	    const waitMs = Math.max(0, Number(ms) || 0);
 	    if (waitMs === 0) return this.state.running;
+	    this.stats.pendingWaitUntilTs = Date.now() + waitMs;
 	    return new Promise((resolve) => {
 	      const timer = setTimeout(() => {
-	        if (this._pendingWait?.timer === timer) this._pendingWait = null;
+	        if (this._pendingWait?.timer === timer) {
+	          this._pendingWait = null;
+	          this.stats.pendingWaitUntilTs = 0;
+	        }
 	        resolve(this.state.running);
 	      }, waitMs);
 	      this._pendingWait = {
@@ -1515,6 +1562,34 @@
 	        resolve: () => resolve(this.state.running),
 	      };
 	    });
+	  }
+
+	  async tryUnarchiveThread(channelId) {
+	    const id = String(channelId || '').trim();
+	    if (!id) return false;
+	    try {
+	      const reqCtl = this.beginAbortableRequest();
+	      this.beforeRequest();
+	      const resp = await fetch(`https://discord.com/api/v9/channels/${id}`, {
+	        method: 'PATCH',
+	        headers: {
+	          Authorization: this.options.authToken,
+	          'Content-Type': 'application/json',
+	        },
+	        body: JSON.stringify({ archived: false }),
+	        signal: reqCtl.signal,
+	      });
+	      this.endAbortableRequest(reqCtl);
+	      this.afterRequest();
+	      if (resp.ok) {
+	        log.info('Thread unarchived — retrying delete.');
+	        return true;
+	      }
+	      log.verb(`Unarchive returned ${resp.status}.`);
+	    } catch (err) {
+	      if (err?.name !== 'AbortError') log.verb('Unarchive failed:', err);
+	    }
+	    return false;
 	  }
 
 	  /** Always run once when a job ends — natural finish or Stop */
@@ -1559,6 +1634,9 @@
 	    this._runFinished = false;
 	    this.state.running = true;
 	    this.stats.startTime = new Date();
+	    this.stats._etrLastUpdateTs = 0;
+	    this.stats.pendingWaitUntilTs = 0;
+	    this.stats.etr = 0;
 
 	    log.success(`Started at ${this.stats.startTime.toLocaleString()}`);
 	    if (this.options.verboseLog) {
@@ -1949,6 +2027,9 @@
 	    this._runFinished = false;
 	    this.state.running = true;
 	    this.stats.startTime = new Date();
+	    this.stats._etrLastUpdateTs = 0;
+	    this.stats.pendingWaitUntilTs = 0;
+	    this.stats.etr = 0;
 
 	    log.success(`Started at ${this.stats.startTime.toLocaleString()}`);
 	    log.info('Interactive media review — choose what to backup or delete for each batch.');
@@ -2026,9 +2107,51 @@
 	    }
 	  }
 
-	  /** Calculate the estimated time remaining based on the current stats */
+	  /** Hybrid ETA — modeled delays + observed throughput + rate-limit history */
 	  calcEtr() {
-	    this.stats.etr = (this.options.searchDelay * Math.round(this.state.grandTotal / 25)) + ((this.options.deleteDelay + this.stats.avgPing) * this.state.grandTotal);
+	    const now = Date.now();
+	    const dtMs = Math.max(16, now - (this.stats._etrLastUpdateTs || now));
+	    this.stats._etrLastUpdateTs = now;
+
+	    const processed = this.processedCount();
+	    const effectiveTotal = Math.max(0, this.state.grandTotal);
+	    const remainingMessages = Math.max(0, effectiveTotal - processed);
+
+	    const deleteDelay = Math.max(0, Number(this.options.deleteDelay) || 0);
+	    const searchDelay = Math.max(0, Number(this.options.searchDelay) || 0);
+	    const avgPing = Math.max(0, Number(this.stats.avgPing) || 0);
+	    const elapsedMs = Math.max(0, now - this.stats.startTime.getTime());
+	    const pendingWaitMs = Math.max(0, Number(this.stats.pendingWaitUntilTs || 0) - now);
+
+	    const deletePhaseMs = remainingMessages * (deleteDelay + avgPing);
+	    const avgDeletePerPage = Math.max(1, Math.min(25, Number(this.state._avgDeletePerPage) || 25));
+	    const remainingSearchPages = remainingMessages > 0 ? Math.ceil(remainingMessages / avgDeletePerPage) : 0;
+	    const searchPhaseMs = remainingSearchPages * searchDelay;
+	    const throttledRatio = elapsedMs > 0
+	      ? Math.max(0, Math.min(0.8, this.stats.throttledTotalTime / elapsedMs))
+	      : 0;
+	    const modeledMs = (deletePhaseMs + searchPhaseMs) * (1 + throttledRatio);
+
+	    let observedMs = modeledMs;
+	    if (processed > 0 && elapsedMs > 0) {
+	      observedMs = (elapsedMs / processed) * remainingMessages;
+	    }
+
+	    const confidenceObserved = Math.max(0, Math.min(1, processed / 50));
+	    const hybridMs = (modeledMs * (1 - confidenceObserved)) + (observedMs * confidenceObserved);
+
+	    let targetMs = Math.max(0, Math.max(pendingWaitMs, hybridMs));
+	    const currentMs = Math.max(0, Number(this.stats.etr) || 0);
+
+	    if (currentMs > 0) {
+	      const dtSec = dtMs / 1000;
+	      const maxRise = Math.max(1200 * dtSec, currentMs * 0.30 * dtSec);
+	      const maxDrop = Math.max(900 * dtSec, currentMs * 0.18 * dtSec);
+	      if (targetMs > currentMs) targetMs = Math.min(targetMs, currentMs + maxRise);
+	      else targetMs = Math.max(targetMs, currentMs - maxDrop);
+	    }
+
+	    this.stats.etr = Math.round(targetMs);
 	  }
 
 	  /** As for confirmation in the beggining process */
@@ -2378,6 +2501,10 @@
 	        try {
 	          const r = JSON.parse(body);
 	          if (resp.status === 400 && r.code === 50083) {
+	            if (this.options.unarchiveThreads && message.channel_id) {
+	              const unarchived = await this.tryUnarchiveThread(message.channel_id);
+	              if (unarchived) return 'RETRY';
+	            }
 	            log.warn('Thread is archived — skipping this message on future searches.');
 	            this.state.offset++;
 	            return 'FAIL_SKIP';
@@ -2392,6 +2519,12 @@
 	      }
 
 	      this.state.delCount++;
+	      const pageDeletes = Number(this.state._messagesToDelete?.length || 0);
+	      if (pageDeletes > 0) {
+	        this.state._avgDeletePerPage = Math.max(1, Math.min(25,
+	          (this.state._avgDeletePerPage * 0.85) + (pageDeletes * 0.15)
+	        ));
+	      }
 	      return 'OK';
 	    }
 	  }
@@ -2723,16 +2856,125 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	};
 	window.messagePicker = messagePicker;
 
-	function getToken() {
-	  window.dispatchEvent(new Event('beforeunload'));
-	  const LS = document.body.appendChild(document.createElement('iframe')).contentWindow.localStorage;
+	function normalizeTokenCandidate(raw) {
+	  if (typeof raw !== 'string') return '';
+	  const s = raw.trim();
+	  if (!s) return '';
 	  try {
-	    return JSON.parse(LS.token);
+	    const parsed = JSON.parse(s);
+	    return typeof parsed === 'string' ? parsed : '';
 	  } catch {
-	    log.info('Could not automatically detect Authorization Token in local storage!');
-	    log.info('Attempting to grab token using webpack');
-	    return (window.webpackChunkdiscord_app.push([[''], {}, e => { window.m = []; for (let c in e.c) window.m.push(e.c[c]); }]), window.m).find(m => m?.exports?.default?.getToken !== void 0).exports.default.getToken();
+	    return s.replace(/^"|"$/g, '');
 	  }
+	}
+
+	function getTokenFromWebpack(globalObj) {
+	  const chunkKeys = Object.keys(globalObj).filter(
+	    k => k.startsWith('webpackChunk') && Array.isArray(globalObj[k]),
+	  );
+	  let req = null;
+	  for (const key of chunkKeys) {
+	    const chunk = globalObj[key];
+	    if (!chunk || typeof chunk.push !== 'function') continue;
+	    try {
+	      chunk.push([[`__undiscord__${Date.now()}`], {}, r => { req = r; }]);
+	      if (req?.c) break;
+	      req = null;
+	    } catch {}
+	  }
+	  if (!req && typeof globalObj.__webpack_require__ === 'function' && globalObj.__webpack_require__.c) {
+	    req = globalObj.__webpack_require__;
+	  }
+	  if (!req?.c) throw new Error('webpack require not found');
+	  const mod = Object.values(req.c).find(m => m?.exports?.default?.getToken || m?.exports?.getToken);
+	  if (!mod) throw new Error('getToken module not found');
+	  if (mod.exports?.default?.getToken) return mod.exports.default.getToken();
+	  if (mod.exports?.getToken) return mod.exports.getToken();
+	  throw new Error('getToken export not callable');
+	}
+
+	function getTokenFromClassicWebpackPush() {
+	  const chunk = window.webpackChunkdiscord_app;
+	  if (!Array.isArray(chunk) || typeof chunk.push !== 'function') {
+	    throw new Error('webpackChunkdiscord_app unavailable');
+	  }
+	  let modules = [];
+	  chunk.push([['__undiscord__classic__'], {}, (e) => {
+	    modules = [];
+	    for (const c in e.c) modules.push(e.c[c]);
+	  }]);
+	  const mod = modules.find(m => m?.exports?.default?.getToken || m?.exports?.getToken);
+	  if (!mod) throw new Error('classic webpack: getToken module not found');
+	  if (mod.exports?.default?.getToken) return mod.exports.default.getToken();
+	  if (mod.exports?.getToken) return mod.exports.getToken();
+	  throw new Error('classic webpack: getToken not callable');
+	}
+
+	function getTokenFromPageContext() {
+	  return new Promise((resolve, reject) => {
+	    const reqId = `undiscord_token_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+	    const timeoutMs = 10000;
+	    let done = false;
+	    const cleanup = () => {
+	      if (done) return;
+	      done = true;
+	      window.removeEventListener('message', onMessage);
+	    };
+	    const onMessage = (event) => {
+	      if (event.source !== window) return;
+	      const data = event.data;
+	      if (!data || data.source !== 'undiscord' || data.id !== reqId) return;
+	      cleanup();
+	      if (data.error) reject(new Error(data.error));
+	      else resolve(normalizeTokenCandidate(data.token || ''));
+	    };
+	    window.addEventListener('message', onMessage);
+	    const script = document.createElement('script');
+	    script.textContent = `(function(){try{
+var g=window,req=null,keys=Object.keys(g).filter(function(k){return k.indexOf('webpackChunk')===0&&Array.isArray(g[k]);});
+for(var i=0;i<keys.length;i++){try{var ch=g[keys[i]];ch.push([['__undiscord_pc__'+Date.now()],{},function(r){req=r;}]);if(req&&req.c)break;req=null;}catch(e){}}
+if(!req&&typeof g.__webpack_require__==='function'&&g.__webpack_require__.c)req=g.__webpack_require__;
+if(!req||!req.c)throw new Error('webpack require not found');
+var mods=Object.values(req.c),mod=null;
+for(var j=0;j<mods.length;j++){var m=mods[j];if(m&&m.exports&&(m.exports.default&&m.exports.default.getToken||m.exports.getToken)){mod=m;break;}}
+if(!mod)throw new Error('getToken module not found');
+var t=mod.exports.default&&mod.exports.default.getToken?mod.exports.default.getToken():mod.exports.getToken();
+window.postMessage({source:'undiscord',id:'${reqId}',token:t||''},'*');
+}catch(e){window.postMessage({source:'undiscord',id:'${reqId}',error:String(e)},'*');}})();`;
+	    script.onerror = () => { cleanup(); reject(new Error('page-context script blocked')); };
+	    (document.head || document.documentElement).appendChild(script);
+	    script.remove();
+	    setTimeout(() => { cleanup(); reject(new Error('token request timeout')); }, timeoutMs);
+	  });
+	}
+
+	async function getToken() {
+	  window.dispatchEvent(new Event('beforeunload'));
+	  const iframe = document.body.appendChild(document.createElement('iframe'));
+	  const LS = iframe.contentWindow.localStorage;
+	  const storageToken = normalizeTokenCandidate(LS.token);
+	  if (storageToken) return storageToken;
+
+	  log.info('Token not in storage — trying webpack…');
+	  try {
+	    const t = normalizeTokenCandidate(getTokenFromWebpack(window));
+	    if (t) return t;
+	  } catch (err) {
+	    log.verb('Webpack token:', err?.message || err);
+	  }
+	  try {
+	    const t = normalizeTokenCandidate(getTokenFromClassicWebpackPush());
+	    if (t) return t;
+	  } catch (err) {
+	    log.verb('Classic webpack:', err?.message || err);
+	  }
+	  try {
+	    const t = normalizeTokenCandidate(await getTokenFromPageContext());
+	    if (t) return t;
+	  } catch (err) {
+	    log.verb('Page context:', err?.message || err);
+	  }
+	  throw new Error('token auto-detection failed');
 	}
 
 	function getAuthorId() {
@@ -2752,16 +2994,120 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	  else alert('Could not find the Channel ID!\nPlease make sure you are on a Channel or DM.');
 	}
 
-	function fillToken() {
+	async function fillToken() {
 	  try {
-	    return getToken();
+	    return await getToken();
 	  } catch (err) {
 	    log.verb(err);
 	    log.error('Could not automatically detect Authorization Token!');
 	    log.info(`Please make sure ${TOOL_NAME} is up to date`);
-	    log.debug('Alternatively, you can try entering a Token manually in the "Advanced Settings" section.');
+	    log.debug('Alternatively, enter a token manually under Advanced → Token.');
 	  }
 	  return '';
+	}
+
+	function getServerChannelIdsFromDom(guildId) {
+	  const gid = String(guildId || '').trim();
+	  if (!gid || gid === '@me') return [];
+	  const rows = Array.from(document.querySelectorAll(
+	    `#app-mount a[data-list-item-id^="channels___"][href^="/channels/${gid}/"]`,
+	  ));
+	  const ids = new Set();
+	  for (const row of rows) {
+	    const href = String(row.getAttribute('href') || '');
+	    const m = href.match(new RegExp(`^/channels/${gid}/(\\d+)`));
+	    if (m) ids.add(m[1]);
+	  }
+	  return Array.from(ids);
+	}
+
+	async function getServerMessageChannels(guildId, authToken) {
+	  const gid = String(guildId || '').trim();
+	  if (!gid || gid === '@me') return [];
+
+	  if (!authToken) {
+	    return getServerChannelIdsFromDom(gid).map(id => ({ id: String(id), type: null, name: '', source: 'dom' }));
+	  }
+
+	  const messageTypes = new Set([0, 5, 10, 11, 12, 13, 15, 16]);
+	  const out = new Map();
+
+	  try {
+	    const resp = await fetch(`https://discord.com/api/v9/guilds/${gid}/channels`, {
+	      headers: { Authorization: authToken },
+	    });
+	    if (!resp.ok) throw new Error(`channels ${resp.status}`);
+	    const channels = await resp.json();
+	    if (!Array.isArray(channels)) throw new Error('channels not array');
+
+	    for (const ch of channels) {
+	      if (!ch || String(ch.guild_id) !== gid) continue;
+	      const type = Number(ch.type);
+	      if (!messageTypes.has(type)) continue;
+	      const id = String(ch.id || '');
+	      if (id) out.set(id, { id, type, name: String(ch.name || ''), source: 'guild_channels' });
+	    }
+
+	    try {
+	      const tResp = await fetch(`https://discord.com/api/v9/guilds/${gid}/threads/active`, {
+	        headers: { Authorization: authToken },
+	      });
+	      if (tResp.ok) {
+	        const tData = await tResp.json();
+	        for (const th of (tData?.threads || [])) {
+	          const thId = String(th?.id || '');
+	          if (!thId) continue;
+	          out.set(thId, {
+	            id: thId,
+	            type: Number(th?.type) || 11,
+	            name: String(th?.name || ''),
+	            source: 'threads_active',
+	          });
+	        }
+	      }
+	    } catch {}
+
+	    const archiveParents = channels
+	      .filter(ch => ch && String(ch.guild_id) === gid && [0, 5, 15, 16].includes(Number(ch.type)))
+	      .map(ch => String(ch.id || ''))
+	      .filter(Boolean);
+
+	    const archivePaths = [
+	      { path: 'threads/archived/public', source: 'threads_archived_public' },
+	      { path: 'users/@me/threads/archived/private', source: 'threads_archived_private_me' },
+	      { path: 'threads/archived/private', source: 'threads_archived_private' },
+	    ];
+
+	    for (const parentId of archiveParents) {
+	      for (const endpoint of archivePaths) {
+	        try {
+	          const aResp = await fetch(
+	            `https://discord.com/api/v9/channels/${parentId}/${endpoint.path}?limit=100`,
+	            { headers: { Authorization: authToken } },
+	          );
+	          if (!aResp.ok) continue;
+	          const aData = await aResp.json();
+	          for (const th of (aData?.threads || [])) {
+	            const thId = String(th?.id || '');
+	            if (!thId) continue;
+	            out.set(thId, {
+	              id: thId,
+	              type: Number(th?.type) || 11,
+	              name: String(th?.name || ''),
+	              source: endpoint.source,
+	            });
+	          }
+	        } catch {}
+	      }
+	    }
+
+	    const resolved = Array.from(out.values());
+	    if (resolved.length) return resolved;
+	  } catch (err) {
+	    log.warn('Guild channel API failed — using sidebar DOM fallback.', err?.message || err);
+	  }
+
+	  return getServerChannelIdsFromDom(gid).map(id => ({ id: String(id), type: null, name: '', source: 'dom' }));
 	}
 
 	const PREFIX = '[UNDISCORD]';
@@ -2802,6 +3148,19 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	  }
 	  const askEl = ui.undiscordWindow.querySelector('#askConfirmation');
 	  if (askEl && profile.askForConfirmation !== undefined) askEl.checked = profile.askForConfirmation;
+	  const allCh = ui.undiscordWindow.querySelector('#deleteAllChannels');
+	  if (allCh && profile.deleteAllChannels !== undefined) allCh.checked = profile.deleteAllChannels;
+	  syncDeleteAllChannelsUI();
+	}
+
+	function syncDeleteAllChannelsUI() {
+	  if (!ui.undiscordWindow) return;
+	  const on = !!ui.undiscordWindow.querySelector('#deleteAllChannels')?.checked;
+	  const chInput = ui.undiscordWindow.querySelector('#channelId');
+	  if (chInput) {
+	    chInput.disabled = on;
+	    chInput.placeholder = on ? 'Auto — all server channels' : 'Channel, or comma-separated';
+	  }
 	}
 
 	function readPipelineFromUI() {
@@ -3088,7 +3447,25 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	  $('button#copyLog').onclick = copyLogAction;
 	  $('button#clear').onclick = () => ui.logArea.innerHTML = '';
 	  $('select#runProfile').onchange = (e) => applyRunProfileToUI(e.target.value);
+	  $('input#deleteAllChannels').onchange = syncDeleteAllChannelsUI;
 	  applyRunProfileToUI('fastWipe');
+
+	  let lastRoutePath = location.pathname;
+	  function tryAutofillFromRoute() {
+	    if (!$('input#autofillOnNavigate').checked) return;
+	    if (undiscordCore.state.running) return;
+	    const m = location.pathname.match(/\/channels\/([\w@]+)\/(\d+)/);
+	    if (!m) return;
+	    $('input#guildId').value = m[1];
+	    if (!$('input#deleteAllChannels').checked) $('input#channelId').value = m[2];
+	  }
+	  tryAutofillFromRoute();
+	  setInterval(() => {
+	    if (location.pathname !== lastRoutePath) {
+	      lastRoutePath = location.pathname;
+	      tryAutofillFromRoute();
+	    }
+	  }, 1200);
 	  $('button#getAuthor').onclick = () => $('input#authorId').value = getAuthorId();
 	  $('button#getGuild').onclick = () => {
 	    const guildId = $('input#guildId').value = getGuildId();
@@ -3117,7 +3494,7 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	    if (id) $('input#maxId').value = id;
 	    toggleWindow();
 	  };
-	  $('button#getToken').onclick = () => $('input#token').value = fillToken();
+	  $('button#getToken').onclick = async () => { $('input#token').value = await fillToken(); };
 
 	  $('input#verboseLog').onchange = () => onLogOptionChange('verbose');
 	  $('input#logDeletions').onchange = () => onLogOptionChange('deletions');
@@ -3205,7 +3582,10 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	    const percent = value >= 0 && max ? Math.round(value / max * 100) + '%' : '';
 	    const elapsed = msToHMS(Date.now() - stats.startTime.getTime());
 	    const remaining = msToHMS(stats.etr);
-	    ui.percent.innerHTML = `${percent} (${value}/${max}) Elapsed: ${elapsed} Remaining: ${remaining}`;
+	    const batchPrefix = state._batchActive && state._batchTotal
+	      ? `Ch ${state._batchIndex}/${state._batchTotal} · `
+	      : '';
+	    ui.percent.innerHTML = `${batchPrefix}${percent} (${value}/${max}) Elapsed: ${elapsed} Remaining: ${remaining}`;
 
 	    ui.progressIcon.value = value;
 	    ui.progressMain.value = value;
@@ -3240,7 +3620,10 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	  // general
 	  const authorId = $('input#authorId').value.trim();
 	  const guildId = $('input#guildId').value.trim();
-	  const channelIds = $('input#channelId').value.trim().split(/\s*,\s*/);
+	  const deleteAllChannels = $('input#deleteAllChannels').checked;
+	  let channelIds = deleteAllChannels
+	    ? []
+	    : $('input#channelId').value.trim().split(/\s*,\s*/).filter(Boolean);
 	  const includeNsfw = $('input#includeNsfw').checked;
 	  // filter
 	  const content = $('input#search').value.trim();
@@ -3269,19 +3652,43 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	  const askForConfirmation = profileId === 'custom'
 	    ? $('input#askConfirmation').checked
 	    : (profile.askForConfirmation ?? false);
+	  const unarchiveThreads = $('input#unarchiveThreads').checked;
 	  const { serverName, channelName } = getDiscordContextNames();
 	  syncLogOptionsFromUI();
 
-	  if (pipeline === 'mediaReview' && channelIds.length > 1) {
+	  if (pipeline === 'mediaReview' && (deleteAllChannels || channelIds.length > 1)) {
 	    return log.error('Interactive media review supports one channel at a time. Use a single Channel ID or run Fast wipe for batch jobs.');
+	  }
+	  if (deleteAllChannels && guildId === '@me') {
+	    return log.error('Server-wide wipe does not work in DMs. Use a real Server ID.');
+	  }
+	  if (deleteAllChannels && pipeline === 'mediaReview') {
+	    return log.error('Server-wide wipe cannot use interactive media review. Switch to Fast wipe or Server wipe profile.');
 	  }
 
 	  // token
-	  const authToken = $('input#token').value.trim() || fillToken();
-	  if (!authToken) return; // get token already logs an error.
+	  const authToken = $('input#token').value.trim() || await fillToken();
+	  if (!authToken) return;
 
 	  // validate input
 	  if (!guildId) return log.error('You must fill the "Server ID" field!');
+
+	  let channelInfos = [];
+	  if (deleteAllChannels) {
+	    log.info('Discovering all message channels in this server…');
+	    channelInfos = await getServerMessageChannels(guildId, authToken);
+	    channelIds = channelInfos.map(c => c.id).filter(Boolean);
+	    if (!channelIds.length) {
+	      return log.error('No message channels found. Open the server in Discord and try again, or enter Channel IDs manually.');
+	    }
+	    const bySource = channelInfos.reduce((acc, c) => {
+	      acc[c.source] = (acc[c.source] || 0) + 1;
+	      return acc;
+	    }, {});
+	    log.info(`Server wipe: ${channelIds.length} channel(s) queued.`);
+	    if ($('input#verboseLog').checked) log.verb('Discovery breakdown:', bySource);
+	    log.warn('Server-wide deletion is slow and rate-limit sensitive. Keep Delete delay ≥ 1.5s.');
+	  }
 
 	  // clear logArea
 	  ui.logArea.innerHTML = '';
@@ -3315,18 +3722,29 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	    askForConfirmation,
 	    serverName,
 	    channelName,
+	    unarchiveThreads,
 	  };
 
 	  if (pipeline === 'mediaReview') {
 	    log.info(`Profile: ${profileId} — interactive review (${mediaScanMode === 'media_only' ? 'attachments only' : 'all messages'}).`);
+	  } else if (profileId === 'serverWipe' || deleteAllChannels) {
+	    log.info(`Profile: ${profileId} — server-wide delete across ${channelIds.length} channel(s).`);
 	  } else if (profileId !== 'fastWipe') {
 	    log.info(`Profile: ${profileId} — direct delete.`);
 	  }
-	  if (channelIds.length > 1) {
-	    const jobs = channelIds.map(ch => ({
-	      guildId: guildId,
-	      channelId: ch,
-	    }));
+
+	  const infoById = new Map(channelInfos.map(c => [c.id, c]));
+
+	  if (channelIds.length > 1 || deleteAllChannels) {
+	    const jobs = channelIds.map(ch => {
+	      const info = infoById.get(ch);
+	      return {
+	        guildId,
+	        channelId: ch,
+	        channelName: info?.name || ch,
+	        serverName,
+	      };
+	    });
 
 	    try {
 	      await undiscordCore.runBatch(jobs);
@@ -3334,10 +3752,8 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	      log.error('CoreException', err);
 	      undiscordCore.state.running = false;
 	      undiscordCore.completeRun();
-    }
-	  }
-	  // single channel
-	  else {
+	    }
+	  } else {
 	    try {
 	      await undiscordCore.run();
 	    } catch (err) {

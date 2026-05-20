@@ -456,7 +456,9 @@
                         <label><input id="hasFile" type="checkbox">has: file</label>
                     </div>
                     <div class="sectionDescription">
-                        <label><input id="includePinned" type="checkbox">Include pinned</label>
+                        <label title="When enabled, pinned messages are deleted too (upstream Undiscord left this off by default)">
+                            <input id="includePinned" type="checkbox" checked> Delete pinned messages
+                        </label>
                     </div>
                 </fieldset>
                 <hr>
@@ -654,8 +656,9 @@
 
 	/** User-facing completion messages */
 	const END_MSG = {
-	  ALL_DELETED: 'Done — all deletable messages were removed.',
-	  NOTHING_TO_DELETE: 'Done — nothing here can be deleted. Discord search often counts system events (calls, joins, pins) that only you can see but cannot remove.',
+	  ALL_DELETED: 'Done — all matching messages were removed.',
+	  PINNED_REMAINING: 'Done — but pinned messages were left. Turn on "Delete pinned messages" under Filters to remove them, then run again.',
+	  NOTHING_TO_DELETE: 'Done — nothing here can be deleted. Discord search often counts system events (calls, joins) that only you can see but cannot remove.',
 	  NO_MATCHES: 'Done — no messages match your search.',
 	  EMPTY_EXHAUSTED: 'Stopped — search kept returning empty pages. Try increasing Empty page retries, or wait and run again.',
 	  EMPTY_END: 'Done — no more search results.',
@@ -703,6 +706,7 @@
 	    _messagesToDelete: [],
 	    _skippedMessages: [],
 	    emptyPageRetryCount: 0,
+	    pinnedSkipCount: 0,
 	  };
 
 	  stats = {
@@ -736,10 +740,23 @@
 	      _messagesToDelete: [],
 	      _skippedMessages: [],
 	      emptyPageRetryCount: 0,
+	      pinnedSkipCount: 0,
 	    };
 
 	    this._skipHintShown = false;
+	    this._pinnedHintShown = false;
 	    this.options.askForConfirmation = true;
+	  }
+
+	  /** Pick an honest completion line (e.g. pinned left when filter is off) */
+	  completionMessage() {
+	    if (!this.options.includePinned && this.state.pinnedSkipCount > 0) {
+	      return END_MSG.PINNED_REMAINING;
+	    }
+	    if (this.state.delCount === 0 && this.state.skipCount > 0) {
+	      return END_MSG.NOTHING_TO_DELETE;
+	    }
+	    return END_MSG.ALL_DELETED;
 	  }
 
 	  /** True when deletes + skips + failures cover Discord's reported total */
@@ -749,9 +766,12 @@
 	  }
 
 	  logSummary(message) {
-	    const { delCount, failCount, skipCount, grandTotal } = this.state;
+	    const { delCount, failCount, skipCount, grandTotal, pinnedSkipCount } = this.state;
 	    log.info(message);
-	    log.info(`Summary: ${delCount} deleted, ${failCount} failed, ${skipCount} skipped (${grandTotal} reported by Discord).`);
+	    const pinnedNote = (!this.options.includePinned && pinnedSkipCount > 0)
+	      ? `, ${pinnedSkipCount} pinned skipped`
+	      : '';
+	    log.info(`Summary: ${delCount} deleted, ${failCount} failed, ${skipCount} skipped${pinnedNote} (${grandTotal} reported by Discord).`);
 	  }
 
 	  logPageStatus() {
@@ -828,7 +848,10 @@
 	    }
 
 	    if (delCount + failCount + skipCount > 0 || grandTotal > 0) {
-	      log.info(`Summary: ${delCount} deleted, ${failCount} failed, ${skipCount} skipped (${grandTotal} reported by Discord).`);
+	      const pinnedNote = (!this.options.includePinned && this.state.pinnedSkipCount > 0)
+	        ? `, ${this.state.pinnedSkipCount} pinned skipped`
+	        : '';
+	      log.info(`Summary: ${delCount} deleted, ${failCount} failed, ${skipCount} skipped${pinnedNote} (${grandTotal} reported by Discord).`);
 	    }
 
 	    log.success(`Finished at ${this.stats.endTime.toLocaleString()} (${elapsed})`);
@@ -889,7 +912,7 @@
 	        this.state.emptyPageRetryCount = 0;
 
 	        if (this.isComplete()) {
-	          this.logSummary(END_MSG.ALL_DELETED);
+	          this.logSummary(this.completionMessage());
 	          console.log(PREFIX$1, '[End state]', this.state);
 	          if (isJob) break;
 	          this.state.running = false;
@@ -898,10 +921,18 @@
 	      else if (this.state._skippedMessages.length > 0) {
 	        // There are stuff, but nothing to delete (example a page full of system messages)
 	        const skipped = this.state._skippedMessages.length;
+	        const pinnedSkipped = this.state._skippedMessages.filter(m => m.pinned).length;
 	        this.state.skipCount += skipped;
+	        if (pinnedSkipped && !this.options.includePinned) {
+	          this.state.pinnedSkipCount += pinnedSkipped;
+	          if (!this._pinnedHintShown) {
+	            this._pinnedHintShown = true;
+	            log.info('Pinned messages are skipped while "Delete pinned messages" is off. Enable it under Filters to delete them.');
+	          }
+	        }
 	        if (!this._skipHintShown) {
 	          this._skipHintShown = true;
-	          log.info('Discord matched messages that cannot be deleted (calls, joins, pins, etc.). They count toward the total but are skipped.');
+	          log.info('Discord matched messages that cannot be deleted (calls, joins, system events, etc.). They count toward the total but are skipped.');
 	        }
 	        if (this.options.verboseLog) {
 	          const oldOffset = this.state.offset;
@@ -914,7 +945,7 @@
 	        this.state.emptyPageRetryCount = 0;
 
 	        if (this.isComplete()) {
-	          this.logSummary(END_MSG.NOTHING_TO_DELETE);
+	          this.logSummary(this.completionMessage());
 	          console.log(PREFIX$1, '[End state]', this.state);
 	          if (isJob) break;
 	          this.state.running = false;
@@ -1074,11 +1105,12 @@
 	    if (total > this.state.grandTotal) this.state.grandTotal = total;
 
 	    // search returns messages near the the actual message, only get the messages we searched for.
-	    const discoveredMessages = data.messages.map(convo => convo.find(message => message.hit === true));
+	    const discoveredMessages = data.messages
+	      .map(convo => convo.find(message => message?.hit === true))
+	      .filter(Boolean);
 
 	    // we can only delete some types of messages, system messages are not deletable.
-	    let messagesToDelete = discoveredMessages;
-	    messagesToDelete = messagesToDelete.filter(msg => msg.type === 0 || (msg.type >= 6 && msg.type <= 21));
+	    let messagesToDelete = discoveredMessages.filter(msg => msg.type === 0 || (msg.type >= 6 && msg.type <= 21));
 	    messagesToDelete = messagesToDelete.filter(msg => msg.pinned ? this.options.includePinned : true);
 
 	    // custom filter of messages

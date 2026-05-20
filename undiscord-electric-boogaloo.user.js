@@ -58,45 +58,298 @@
 /* Force layout canvas elements to align evenly at the bottom */
 #undiscord .window-body {
     height: calc(100% - 48px) !important;
+    min-height: 0 !important;
     display: flex !important;
     flex-direction: row !important;
-    align-items: stretch !important; /* Keeps panels perfectly aligned at bottom */
+    align-items: stretch !important;
     overflow: hidden !important;
 }
 
 #undiscord .sidebar {
     background-color: #1e1f22 !important;
-    width: 270px;
-    min-width: 270px;
-    padding: 16px 12px !important;
+    width: 300px;
+    min-width: 300px;
+    max-width: 300px;
+    padding: 0 !important;
     height: 100% !important;
+    min-height: 0 !important;
     box-sizing: border-box !important;
     border-right: 1px solid #111214 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    flex-shrink: 0 !important;
+}
+
+#undiscord.hide-sidebar .sidebar {
+    display: none !important;
+}
+
+#undiscord .sidebar-nav {
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    padding: 12px 10px 24px 12px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    align-content: flex-start !important;
+}
+
+#undiscord .sidebar-section {
+    flex-shrink: 0 !important;
+    flex-grow: 0 !important;
+    background-color: #2b2d31 !important;
+    border: 1px solid #3f4147 !important;
+    border-radius: 8px !important;
+    overflow: visible !important;
+}
+
+#undiscord .sidebar-section > summary {
+    list-style: none !important;
+    padding: 11px 14px !important;
+    margin: 0 !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.06em !important;
+    text-transform: uppercase !important;
+    color: #b5bac1 !important;
+    cursor: pointer !important;
+    user-select: none !important;
+    transition: background 0.15s ease, color 0.15s ease !important;
+}
+
+#undiscord .sidebar-section > summary::-webkit-details-marker {
+    display: none !important;
+}
+
+#undiscord .sidebar-section > summary::after {
+    content: "▾" !important;
+    float: right !important;
+    color: #949ba4 !important;
+    font-weight: 400 !important;
+}
+
+#undiscord .sidebar-section:not([open]) > summary::after {
+    content: "▸" !important;
+}
+
+#undiscord .sidebar-section > summary:hover {
+    background-color: #35373c !important;
+    color: #f2f3f5 !important;
+}
+
+#undiscord .sidebar-section-body {
+    padding: 14px 14px 18px 14px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 18px !important;
+    border-top: 1px solid #3f4147 !important;
+    overflow: visible !important;
+}
+
+#undiscord .field {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+}
+
+#undiscord .field-label {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+    color: #dbdee1 !important;
+    margin: 0 !important;
+}
+
+#undiscord .field-help {
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    color: #949ba4 !important;
+    text-decoration: none !important;
+    padding: 2px 8px !important;
+    border-radius: 10px !important;
+    background-color: #383a40 !important;
+    flex-shrink: 0 !important;
+    text-transform: none !important;
+}
+
+#undiscord .field-help:hover {
+    color: #f2f3f5 !important;
+    background-color: #5865f2 !important;
+}
+
+#undiscord .field-row {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+}
+
+#undiscord .field-row .input-wrapper {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+}
+
+#undiscord .field-btn {
+    flex: 0 0 auto !important;
+    min-width: 76px !important;
+    width: auto !important;
+    margin: 0 !important;
+    padding: 0 14px !important;
+    background-color: #4e5058 !important;
+}
+
+#undiscord .field-btn:hover {
+    background-color: #5865f2 !important;
+}
+
+#undiscord .field-hint {
+    font-size: 12px !important;
+    line-height: 1.45 !important;
+    font-weight: 400 !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+    color: #949ba4 !important;
+    margin: 0 !important;
+}
+
+#undiscord .field-hint-warn {
+    color: #faa61a !important;
+}
+
+#undiscord .field-group-title {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    color: #949ba4 !important;
+    margin: 4px 0 0 0 !important;
+}
+
+#undiscord .check-list {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    padding: 12px !important;
+    background-color: #232428 !important;
+    border-radius: 6px !important;
+    border: 1px solid #3f4147 !important;
+}
+
+#undiscord .check-list label {
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+    color: #dbdee1 !important;
+    cursor: pointer !important;
+    margin: 0 !important;
+    line-height: 1.35 !important;
+}
+
+#undiscord .check-list input[type="checkbox"] {
+    margin: 2px 0 0 0 !important;
+    accent-color: #5865f2 !important;
+    flex-shrink: 0 !important;
+}
+
+#undiscord .pattern-row .input-wrapper {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+}
+
+#undiscord .pattern-row .info {
+    color: #949ba4 !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    flex-shrink: 0 !important;
+}
+
+#undiscord .delay-row .input-wrapper {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+#undiscord .delay-row .info {
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    color: #949ba4 !important;
+    flex-shrink: 0 !important;
+}
+
+#undiscord .sidebar-footer {
+    flex-shrink: 0 !important;
+    padding: 12px 14px 14px !important;
+    background-color: #111214 !important;
+    border-top: 1px solid #3f4147 !important;
+}
+
+#undiscord .sidebar-footer .footer-title {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #f2f3f5 !important;
+    margin: 0 0 4px 0 !important;
+    text-transform: none !important;
+}
+
+#undiscord .sidebar-footer .footer-meta {
+    font-size: 12px !important;
+    line-height: 1.5 !important;
+    color: #949ba4 !important;
+    margin: 0 !important;
+    text-transform: none !important;
+    font-weight: 400 !important;
+}
+
+#undiscord .sidebar-footer a {
+    color: #00a8fc !important;
+    text-decoration: none !important;
+}
+
+#undiscord .sidebar-footer a:hover {
+    text-decoration: underline !important;
+}
+
+#undiscord .field-hint code {
+    background-color: #111214 !important;
+    padding: 2px 5px !important;
+    border-radius: 4px !important;
+    font-size: 11px !important;
+    color: #b5bac1 !important;
 }
 
 #undiscord .main {
     background-color: #313338 !important;
     display: flex !important;
     flex-direction: column !important;
-    flex-grow: 1;
+    flex: 1 1 0 !important;
     min-width: 0 !important;
+    min-height: 0 !important;
     height: 100% !important;
+    max-width: none !important;
     box-sizing: border-box !important;
 }
 
-/* Fix stacked input containers with proper padding margins */
-#undiscord fieldset {
-    margin-top: 10px !important;
-    margin-bottom: 24px !important; /* Gives breathing room to elements below */
-    border: none !important;
-    padding: 0 !important;
-}
-
-#undiscord .multiInput {
-    display: flex !important;
-    flex-direction: column !important; /* Stack cleanly */
-    align-items: stretch !important;
-    gap: 6px !important;
+#undiscord.hide-sidebar .main {
+    flex: 1 1 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
 }
 
 #undiscord .input-wrapper {
@@ -105,7 +358,9 @@
 
 /* Custom styled layout text boxes */
 #undiscord input[type="text"],
+#undiscord input[type="number"],
 #undiscord input[type="datetime-local"],
+#undiscord input[type="file"],
 #undiscord .input {
     background-color: #111214 !important;
     border: 1px solid #3f4147 !important;
@@ -124,22 +379,6 @@
     outline: none !important;
 }
 
-/* Clean, modern label typography */
-#undiscord legend, #undiscord label, #undiscord summary {
-    color: #949ba4 !important;
-    font-size: 12px !important;
-    font-weight: 700 !important;
-    text-transform: uppercase !important;
-    margin-bottom: 6px !important;
-    letter-spacing: 0.5px;
-}
-
-#undiscord summary {
-    font-size: 14px !important;
-    color: #dbdee1 !important;
-    cursor: pointer;
-}
-
 /* Layout action selector buttons */
 #undiscord .btn, #undiscord button {
     color: #ffffff !important;
@@ -153,16 +392,6 @@
     box-sizing: border-box !important;
 }
 
-/* Sidebar action button structural configuration */
-#undiscord .sidebar button {
-    width: 100% !important; /* Makes target select buttons full width below text fields */
-    margin: 2px 0 0 0 !important;
-    background-color: #383a40 !important;
-}
-
-#undiscord .sidebar button:hover {
-    background-color: #4e5058 !important;
-}
 
 /* Top control actions toolbar block */
 #undiscord .tbar {
@@ -238,12 +467,6 @@
     flex-shrink: 0;
 }
 
-#undiscord hr {
-    border: none !important;
-    border-bottom: 1px solid #3f4147 !important;
-    margin: 20px 0 !important;
-}
-
 #undiscord .info {
     font-size: 12px !important;
     line-height: 1.5 !important;
@@ -302,21 +525,19 @@
 
 	var mainCss = (`
 /**** Undiscord Button ****/
-#undicord-btn { position: relative; width: auto; height: 24px; margin: 0 8px; cursor: pointer; color: var(--interactive-normal); flex: 0 0 auto; }
+#undicord-btn { position: relative; display: inline-flex !important; align-items: center; justify-content: center; width: 24px; min-width: 24px; height: 24px; margin: 0 8px; padding: 0; cursor: pointer; color: var(--interactive-text-default, var(--interactive-normal)); flex: 0 0 auto; z-index: 1; transition: color var(--custom-button-transition-duration, 0.15s) ease, background-color var(--custom-button-transition-duration, 0.15s) ease; }
+#undicord-btn:hover { color: var(--interactive-text-hover, var(--interactive-hover, var(--interactive-active))); }
 #undicord-btn.undiscord-floating { position: fixed !important; bottom: 24px !important; right: 24px !important; z-index: 999999 !important; margin: 0 !important; padding: 8px !important; border-radius: 50% !important; background: var(--background-floating, #2b2d31) !important; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45) !important; }
 #undicord-btn progress { position: absolute; top: 23px; left: -4px; width: 32px; height: 12px; display: none; }
-#undicord-btn.running { color: var(--button-danger-background) !important; }
+#undicord-btn.running { color: var(--control-critical-primary-background-default, var(--button-danger-background)) !important; }
 #undicord-btn.running progress { display: block; }
 /**** Undiscord Interface ****/
-#undiscord { position: fixed; z-index: 100; display: flex; flex-direction: column; width: 960px; min-width: 960px; max-width: 96vw; height: 80vh; min-height: 448px; max-height: 100vh; color: var(--text-normal); border-radius: 4px; background-color: var(--background-secondary); box-shadow: var(--elevation-stroke), var(--elevation-high); will-change: top, left, height; }
+#undiscord { position: fixed; z-index: 100; display: flex; flex-direction: column; width: 960px; min-width: 960px; max-width: 96vw; height: 80vh; min-height: 448px; max-height: 100vh; color: var(--text-default, var(--text-normal)); border-radius: 4px; background-color: var(--background-surface-high, var(--background-secondary)); box-shadow: var(--elevation-stroke), var(--elevation-high); will-change: top, left, height; }
 #undiscord .header .icon { cursor: pointer; }
-#undiscord .window-body { height: calc(100% - 48px); }
-#undiscord .sidebar { overflow: hidden scroll; overflow-y: auto; width: 270px; min-width: 250px; height: 100%; max-height: 100%; padding: 8px; background: var(--bg-overlay-4, var(--background-base-lowest)); }
-#undiscord .sidebar legend,
-#undiscord .sidebar label { display: block; width: 100%; }
-#undiscord .main { display: flex; max-width: calc(100% - 250px); background-color: var(--bg-overlay-chat, var(--background-base-lower)); flex-grow: 1; }
-#undiscord.hide-sidebar .sidebar { display: none; }
-#undiscord.hide-sidebar .main { max-width: 100%; }
+#undiscord .window-body { height: calc(100% - 48px); min-height: 0; }
+#undiscord .main { display: flex; flex: 1; min-width: 0; min-height: 0; background-color: var(--bg-overlay-chat, var(--background-base-lower)); }
+#undiscord.hide-sidebar .sidebar { display: none !important; }
+#undiscord.hide-sidebar .main { max-width: 100%; width: 100%; }
 #undiscord #logArea { font-family: Consolas, Liberation Mono, Menlo, Courier, monospace; font-size: 0.75rem; padding: 10px; user-select: text; flex-grow: 1; min-width: 0; min-height: 0; cursor: auto; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; overflow-x: hidden; overflow-y: auto; }
 #undiscord #logArea .log { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; max-width: 100%; line-height: 1.45; margin-bottom: 4px; }
 #undiscord .tbar { padding: 8px; background-color: var(--bg-overlay-2, var(--__header-bar-background)); }
@@ -326,9 +547,6 @@
 #undiscord .footer #progressPercent { padding: 0 1em; font-size: small; color: var(--interactive-muted); flex-grow: 1; min-width: 0; overflow-wrap: anywhere; word-break: break-word; white-space: normal; }
 .resize-handle { position: absolute; bottom: -15px; right: -15px; width: 30px; height: 30px; transform: rotate(-45deg); background: repeating-linear-gradient(0, var(--background-modifier-accent), var(--background-modifier-accent) 1px, transparent 2px, transparent 4px); cursor: nwse-resize; }
 /**** Elements ****/
-#undiscord summary { font-size: 16px; font-weight: 500; line-height: 20px; position: relative; overflow: hidden; margin-bottom: 2px; padding: 6px 10px; cursor: pointer; white-space: nowrap; text-overflow: ellipsis; color: var(--interactive-normal); border-radius: 4px; flex-shrink: 0; }
-#undiscord fieldset { padding-left: 8px; }
-#undiscord legend a { float: right; text-transform: initial; }
 #undiscord progress { height: 8px; margin-top: 4px; flex-grow: 1; }
 #undiscord .importJson { display: flex; flex-direction: row; }
 #undiscord .importJson button { margin-left: 5px; width: fit-content; }
@@ -371,222 +589,221 @@
         <div class="spacer"></div>
     </div>
     <div class="window-body" style="display: flex; flex-direction: row;">
-        <div class="sidebar scroll">
-            <details open>
-                <summary>General</summary>
-                <fieldset>
-                    <legend>
-                        Author ID
-                        <a href="{{WIKI}}/authorId" title="Help" target="_blank" rel="noopener noreferrer">help</a>
-                    </legend>
-                    <div class="multiInput">
-                        <div class="input-wrapper">
-                            <input class="input" id="authorId" type="text" priv>
+        <div class="sidebar">
+            <div class="sidebar-nav scroll">
+                <details class="sidebar-section" open>
+                    <summary>Target</summary>
+                    <div class="sidebar-section-body">
+                        <div class="field">
+                            <div class="field-label">
+                                <span>Author ID</span>
+                                <a class="field-help" href="{{WIKI}}/authorId" title="Help" target="_blank" rel="noopener noreferrer">Help</a>
+                            </div>
+                            <div class="field-row">
+                                <div class="input-wrapper">
+                                    <input class="input" id="authorId" type="text" placeholder="Your user ID" priv>
+                                </div>
+                                <button type="button" class="field-btn" id="getAuthor">Me</button>
+                            </div>
                         </div>
-                        <button id="getAuthor">me</button>
-                    </div>
-                </fieldset>
-                <hr>
-                <fieldset>
-                    <legend>
-                        Server ID
-                        <a href="{{WIKI}}/guildId" title="Help" target="_blank" rel="noopener noreferrer">help</a>
-                    </legend>
-                    <div class="multiInput">
-                        <div class="input-wrapper">
-                            <input class="input" id="guildId" type="text" priv>
+                        <div class="field">
+                            <div class="field-label">
+                                <span>Server ID</span>
+                                <a class="field-help" href="{{WIKI}}/guildId" title="Help" target="_blank" rel="noopener noreferrer">Help</a>
+                            </div>
+                            <div class="field-row">
+                                <div class="input-wrapper">
+                                    <input class="input" id="guildId" type="text" placeholder="Guild or @me for DMs" priv>
+                                </div>
+                                <button type="button" class="field-btn" id="getGuild">Current</button>
+                            </div>
                         </div>
-                        <button id="getGuild">current</button>
-                    </div>
-                </fieldset>
-                <fieldset>
-                    <legend>
-                        Channel ID
-                        <a href="{{WIKI}}/channelId" title="Help" target="_blank" rel="noopener noreferrer">help</a>
-                    </legend>
-                    <div class="multiInput mb1">
-                        <div class="input-wrapper">
-                            <input class="input" id="channelId" type="text" priv>
+                        <div class="field">
+                            <div class="field-label">
+                                <span>Channel ID</span>
+                                <a class="field-help" href="{{WIKI}}/channelId" title="Help" target="_blank" rel="noopener noreferrer">Help</a>
+                            </div>
+                            <div class="field-row">
+                                <div class="input-wrapper">
+                                    <input class="input" id="channelId" type="text" placeholder="Channel, or comma-separated" priv>
+                                </div>
+                                <button type="button" class="field-btn" id="getChannel">Current</button>
+                            </div>
+                            <p class="field-hint">Use commas for multiple channels. Import a Discord export below for batch wipes.</p>
+                            <div class="check-list">
+                                <label title="Required for Discord to return messages from age-restricted channels when searching a server">
+                                    <input id="includeNsfw" type="checkbox">
+                                    <span>Include NSFW channels (server search only)</span>
+                                </label>
+                            </div>
                         </div>
-                        <button id="getChannel">current</button>
                     </div>
-                    <div class="sectionDescription">
-                        <label class="row" title="Required for Discord to return messages from age-restricted channels when searching a server">
-                            <input id="includeNsfw" type="checkbox"> Include NSFW channels (server search)
-                        </label>
-                        <div class="sectionDescription">Only applies to server channels, not DMs. Enable if you are wiping an age-restricted channel.</div>
-                    </div>
-                </fieldset>
-            </details>
-            <details>
-                <summary>Wipe Archive</summary>
-                <fieldset>
-                    <legend>
-                        Import index.json
-                        <a href="{{WIKI}}/importJson" title="Help" target="_blank" rel="noopener noreferrer">help</a>
-                    </legend>
-                    <div class="input-wrapper">
-                        <input type="file" id="importJsonInput" accept="application/json,.json" style="width:100%";>
-                    </div>
-                    <div class="sectionDescription">
-                        <br>
-                        After requesting your data from discord, you can import it here.<br>
-                        Select the "messages/index.json" file from the discord archive.
-                    </div>
-                </fieldset>
-            </details>
-            <hr>
-            <details>
-                <summary>Filter</summary>
-                <fieldset>
-                    <legend>
-                        Search
-                        <a href="{{WIKI}}/filters" title="Help" target="_blank" rel="noopener noreferrer">help</a>
-                    </legend>
-                    <div class="input-wrapper">
-                        <input id="search" type="text" placeholder="Containing text" priv>
-                    </div>
-                    <div class="sectionDescription">
-                        Only delete messages that contain the text
-                    </div>
-                    <div class="sectionDescription">
-                        <label><input id="hasLink" type="checkbox">has: link</label>
-                    </div>
-                    <div class="sectionDescription">
-                        <label><input id="hasFile" type="checkbox">has: file</label>
-                    </div>
-                    <div class="sectionDescription">
-                        <label title="When enabled, pinned messages are deleted too (upstream Undiscord left this off by default)">
-                            <input id="includePinned" type="checkbox" checked> Delete pinned messages
-                        </label>
-                    </div>
-                </fieldset>
-                <hr>
-                <fieldset>
-                    <legend>
-                        Pattern
-                        <a href="{{WIKI}}/pattern" title="Help" target="_blank" rel="noopener noreferrer">help</a>
-                    </legend>
-                    <div class="sectionDescription">
-                        Delete messages that match the regular expression
-                    </div>
-                    <div class="input-wrapper">
-                        <span class="info">/</span>
-                        <input id="pattern" type="text" placeholder="regular expression" priv>
-                        <span class="info">/</span>
-                    </div>
-                </fieldset>
-            </details>
-            <details>
-                <summary>Messages interval</summary>
-                <fieldset>
-                    <legend>
-                        Interval of messages
-                        <a href="{{WIKI}}/messageId" title="Help" target="_blank" rel="noopener noreferrer">help</a>
-                    </legend>
-                    <div class="multiInput mb1">
-                        <div class="input-wrapper">
-                            <input id="minId" type="text" placeholder="After a message" priv>
+                </details>
+
+                <details class="sidebar-section">
+                    <summary>Filters</summary>
+                    <div class="sidebar-section-body">
+                        <div class="field">
+                            <div class="field-label">
+                                <span>Text contains</span>
+                                <a class="field-help" href="{{WIKI}}/filters" title="Help" target="_blank" rel="noopener noreferrer">Help</a>
+                            </div>
+                            <div class="input-wrapper">
+                                <input id="search" type="text" placeholder="Only delete messages matching this text" priv>
+                            </div>
                         </div>
-                        <button id="pickMessageAfter">Pick</button>
-                    </div>
-                    <div class="multiInput">
-                        <div class="input-wrapper">
-                            <input id="maxId" type="text" placeholder="Before a message" priv>
+                        <div class="field">
+                            <div class="field-label">
+                                <span>Quick filters</span>
+                            </div>
+                            <div class="check-list">
+                                <label><input id="hasLink" type="checkbox"><span>Has link</span></label>
+                                <label><input id="hasFile" type="checkbox"><span>Has file</span></label>
+                                <label title="When enabled, pinned messages are deleted too">
+                                    <input id="includePinned" type="checkbox" checked>
+                                    <span>Delete pinned messages</span>
+                                </label>
+                            </div>
                         </div>
-                        <button id="pickMessageBefore">Pick</button>
-                    </div>
-                    <div class="sectionDescription">
-                        Specify an interval to delete messages.
-                    </div>
-                </fieldset>
-            </details>
-            <details>
-                <summary>Date interval</summary>
-                <fieldset>
-                    <legend>
-                        After date
-                        <a href="{{WIKI}}/dateRange" title="Help" target="_blank" rel="noopener noreferrer">help</a>
-                    </legend>
-                    <div class="input-wrapper mb1">
-                        <input id="minDate" type="datetime-local" title="Messages posted AFTER this date">
-                    </div>
-                    <legend>
-                        Before date
-                        <a href="{{WIKI}}/dateRange" title="Help" target="_blank" rel="noopener noreferrer">help</a>
-                    </legend>
-                    <div class="input-wrapper">
-                        <input id="maxDate" type="datetime-local" title="Messages posted BEFORE this date">
-                    </div>
-                    <div class="sectionDescription">
-                        Delete messages that were posted between the two dates.
-                    </div>
-                    <div class="sectionDescription">
-                        * Filtering by date doesn't work if you use the "Messages interval".
-                    </div>
-                </fieldset>
-            </details>
-            <hr>
-            <details>
-                <summary>Advanced settings</summary>
-                <fieldset>
-                    <legend>
-                        Search delay
-                        <a href="{{WIKI}}/delay" title="Help" target="_blank" rel="noopener noreferrer">help</a>
-                    </legend>
-                    <div class="input-wrapper">
-                        <input id="searchDelay" class="input" type="number" value="30" min="1" max="60" step="1" title="Seconds between search pages">
-                        <span class="info">sec</span>
-                    </div>
-                    <div class="sectionDescription">
-                        Pause between each search page (1–60 seconds). Default 30.
-                    </div>
-                </fieldset>
-                <fieldset>
-                    <legend>
-                        Delete delay
-                        <a href="{{WIKI}}/delay" title="Help" target="_blank" rel="noopener noreferrer">help</a>
-                    </legend>
-                    <div class="input-wrapper">
-                        <input id="deleteDelay" class="input" type="number" value="1" min="0.1" max="10" step="0.1" title="Seconds between each delete">
-                        <span class="info">sec</span>
-                    </div>
-                    <br>
-                    <div class="sectionDescription">
-                        Pause between each delete (0.1–10 seconds). Default 1. Increase if you hit rate limits.
-                    </div>
-                </fieldset>
-                <fieldset>
-                    <legend>Empty page retries</legend>
-                    <div class="input-wrapper">
-                        <input id="emptyPageRetries" type="number" value="2" min="0" max="10" step="1">
-                    </div>
-                    <br>
-                    <div class="sectionDescription">
-                        Retries when the search API returns an empty page before stopping. Discord sometimes returns empty pages transiently.
-                    </div>
-                </fieldset>
-                <hr>
-                <fieldset>
-                    <legend>
-                        Authorization Token
-                        <a href="{{WIKI}}/authToken" title="Help" target="_blank" rel="noopener noreferrer">help</a>
-                    </legend>
-                    <div class="multiInput">
-                        <div class="input-wrapper">
-                            <input class="input" id="token" type="text" autocomplete="dont" priv>
+                        <div class="field">
+                            <div class="field-label">
+                                <span>Regex pattern</span>
+                                <a class="field-help" href="{{WIKI}}/pattern" title="Help" target="_blank" rel="noopener noreferrer">Help</a>
+                            </div>
+                            <div class="input-wrapper pattern-row">
+                                <span class="info">/</span>
+                                <input id="pattern" type="text" placeholder="regular expression" priv>
+                                <span class="info">/</span>
+                            </div>
+                            <p class="field-hint">Case-insensitive. Leave empty to ignore.</p>
                         </div>
-                        <button id="getToken">fill</button>
                     </div>
-                </fieldset>
-            </details>
-            <hr>
-            <div></div>
-            <div class="info">
-                <strong>{{TOOL_NAME}}</strong> v{{VERSION}}
-                <br> by <a href="https://github.com/Levskitron" target="_blank" rel="noopener noreferrer">Levskitron</a>
-                <br> fork of <a href="{{ORIGINAL}}" target="_blank" rel="noopener noreferrer" title="Original Undiscord by Victornpb">Undiscord</a> (victornpb)
+                </details>
+
+                <details class="sidebar-section">
+                    <summary>Limits</summary>
+                    <div class="sidebar-section-body">
+                        <p class="field-group-title">Message IDs</p>
+                        <div class="field">
+                            <div class="field-label">
+                                <span>After message</span>
+                                <a class="field-help" href="{{WIKI}}/messageId" title="Help" target="_blank" rel="noopener noreferrer">Help</a>
+                            </div>
+                            <div class="field-row">
+                                <div class="input-wrapper">
+                                    <input id="minId" type="text" placeholder="Delete newer than this ID" priv>
+                                </div>
+                                <button type="button" class="field-btn" id="pickMessageAfter">Pick</button>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <div class="field-label">
+                                <span>Before message</span>
+                            </div>
+                            <div class="field-row">
+                                <div class="input-wrapper">
+                                    <input id="maxId" type="text" placeholder="Delete older than this ID" priv>
+                                </div>
+                                <button type="button" class="field-btn" id="pickMessageBefore">Pick</button>
+                            </div>
+                        </div>
+                        <p class="field-group-title">Date range</p>
+                        <div class="field">
+                            <div class="field-label">
+                                <span>Posted after</span>
+                                <a class="field-help" href="{{WIKI}}/dateRange" title="Help" target="_blank" rel="noopener noreferrer">Help</a>
+                            </div>
+                            <div class="input-wrapper">
+                                <input id="minDate" type="datetime-local" title="Messages posted AFTER this date">
+                            </div>
+                        </div>
+                        <div class="field">
+                            <div class="field-label">
+                                <span>Posted before</span>
+                            </div>
+                            <div class="input-wrapper">
+                                <input id="maxDate" type="datetime-local" title="Messages posted BEFORE this date">
+                            </div>
+                            <p class="field-hint field-hint-warn">Date filters do not work together with message ID limits.</p>
+                        </div>
+                    </div>
+                </details>
+
+                <details class="sidebar-section">
+                    <summary>Bulk archive</summary>
+                    <div class="sidebar-section-body">
+                        <div class="field">
+                            <div class="field-label">
+                                <span>Import index.json</span>
+                                <a class="field-help" href="{{WIKI}}/importJson" title="Help" target="_blank" rel="noopener noreferrer">Help</a>
+                            </div>
+                            <div class="input-wrapper">
+                                <input type="file" id="importJsonInput" accept="application/json,.json">
+                            </div>
+                            <p class="field-hint">From a Discord data export: choose <code>messages/index.json</code> to fill channel IDs for a full archive wipe.</p>
+                        </div>
+                    </div>
+                </details>
+
+                <details class="sidebar-section">
+                    <summary>Advanced</summary>
+                    <div class="sidebar-section-body">
+                        <p class="field-group-title">Timing</p>
+                        <div class="field">
+                            <div class="field-label">
+                                <span>Search delay</span>
+                                <a class="field-help" href="{{WIKI}}/delay" title="Help" target="_blank" rel="noopener noreferrer">Help</a>
+                            </div>
+                            <div class="input-wrapper delay-row">
+                                <input id="searchDelay" class="input" type="number" value="30" min="1" max="60" step="1" title="Seconds between search pages">
+                                <span class="info">sec</span>
+                            </div>
+                            <p class="field-hint">Pause between search pages (1–60 s). Default 30.</p>
+                        </div>
+                        <div class="field">
+                            <div class="field-label">
+                                <span>Delete delay</span>
+                                <a class="field-help" href="{{WIKI}}/delay" title="Help" target="_blank" rel="noopener noreferrer">Help</a>
+                            </div>
+                            <div class="input-wrapper delay-row">
+                                <input id="deleteDelay" class="input" type="number" value="1" min="0.1" max="10" step="0.1" title="Seconds between each delete">
+                                <span class="info">sec</span>
+                            </div>
+                            <p class="field-hint">Pause between deletes (0.1–10 s). Raise if rate limited.</p>
+                        </div>
+                        <p class="field-group-title">Reliability</p>
+                        <div class="field">
+                            <div class="field-label">
+                                <span>Empty page retries</span>
+                            </div>
+                            <div class="input-wrapper">
+                                <input id="emptyPageRetries" class="input" type="number" value="2" min="0" max="10" step="1">
+                            </div>
+                            <p class="field-hint">Retries when Discord returns an empty search page before stopping.</p>
+                        </div>
+                        <p class="field-group-title">Authentication</p>
+                        <div class="field">
+                            <div class="field-label">
+                                <span>Token</span>
+                                <a class="field-help" href="{{WIKI}}/authToken" title="Help" target="_blank" rel="noopener noreferrer">Help</a>
+                            </div>
+                            <div class="field-row">
+                                <div class="input-wrapper">
+                                    <input class="input" id="token" type="text" autocomplete="off" placeholder="Usually auto-filled" priv>
+                                </div>
+                                <button type="button" class="field-btn" id="getToken">Fill</button>
+                            </div>
+                        </div>
+                    </div>
+                </details>
             </div>
+            <footer class="sidebar-footer">
+                <div class="footer-title">{{TOOL_NAME}} v{{VERSION}}</div>
+                <p class="footer-meta">
+                    by <a href="https://github.com/Levskitron" target="_blank" rel="noopener noreferrer">Levskitron</a>
+                    · fork of <a href="{{ORIGINAL}}" target="_blank" rel="noopener noreferrer" title="Original Undiscord by Victornpb">Undiscord</a>
+                </p>
+            </footer>
         </div>
         <div class="main col">
             <div class="tbar col">
@@ -1120,6 +1337,12 @@
 	        if (!this.state.running) return;
 	        return await this.search();
 	      }
+	      else if (resp.status === 403) {
+	        // Insufficient permissions for this channel/guild search — PR #740
+	        log.warn('Search returned 403 (insufficient permissions). Treating as empty and continuing.', await resp.json());
+	        this.state._seachResponse = { messages: [] };
+	        return this.state._seachResponse;
+	      }
 	      else {
 	        this.state.running = false;
 	        log.error(`Error searching messages, API responded with status ${resp.status}!\n`, await resp.json());
@@ -1145,7 +1368,8 @@
 	      .filter(Boolean);
 
 	    // we can only delete some types of messages, system messages are not deletable.
-	    let messagesToDelete = discoveredMessages.filter(msg => msg.type === 0 || (msg.type >= 6 && msg.type <= 21));
+	    // type 46 = polls (self-deletable) — PR #741
+	    let messagesToDelete = discoveredMessages.filter(msg => msg.type === 0 || msg.type === 46 || (msg.type >= 6 && msg.type <= 19));
 	    messagesToDelete = messagesToDelete.filter(msg => msg.pinned ? this.options.includePinned : true);
 
 	    // custom filter of messages
@@ -1179,17 +1403,26 @@
 	      if (this.options.logEveryDeletion) log.info(deletionLine);
 	      else log.debug(deletionLine);
 
-	      // Delete a single message (with retry)
+	      // Delete a single message (with retry) — logic aligned with PR #743
 	      let attempt = 0;
 	      while (attempt < this.options.maxAttempt) {
 	        const result = await this.deleteMessage(message);
+	        attempt++;
 
-	        if (result === 'RETRY') {
-	          attempt++;
+	        if (result === 'RETRY' || result === 'FAILED') {
+	          if (attempt >= this.options.maxAttempt) {
+	            this.state.offset++;
+	            this.state.failCount++;
+	            break;
+	          }
 	          log.verb(`Retrying in ${this.options.deleteDelay}ms... (${attempt}/${this.options.maxAttempt})`);
 	          if (!await this.interruptibleWait(this.options.deleteDelay)) return;
+	          continue;
 	        }
-	        else break;
+	        if (result === 'FAIL_SKIP') {
+	          break;
+	        }
+	        break;
 	      }
 
 	      if (!this.state.running) return;
@@ -1217,7 +1450,6 @@
 	      // no response error (e.g. network error)
 	      log.error('Delete request throwed an error:', err);
 	      log.verb('Related object:', redact(JSON.stringify(message)));
-	      this.state.failCount++;
 	      return 'FAILED';
 	    }
 
@@ -1245,13 +1477,11 @@
 	            // otherwise it will come up again in the next page (and fail to delete again)
 	            log.warn('Error deleting message (Thread is archived). Will increment offset so we don\'t search this in the next page...');
 	            this.state.offset++;
-	            this.state.failCount++;
 	            return 'FAIL_SKIP'; // Failed but we will skip it next time
 	          }
 
 	          log.error(`Error deleting message, API responded with status ${resp.status}!`, r);
 	          log.verb('Related object:', redact(JSON.stringify(message)));
-	          this.state.failCount++;
 	          return 'FAILED';
 	        } catch (e) {
 	          log.error(`Fail to parse JSON. API responded with status ${resp.status}!`, body);
@@ -1715,37 +1945,94 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	  const isUndiscordBtnVisible = () => {
 	    if (!ui.undiscordBtn?.isConnected) return false;
 	    const r = ui.undiscordBtn.getBoundingClientRect();
-	    return r.width > 0 && r.height > 0;
+	    if (r.width < 4 || r.height < 4) return false;
+	    const style = getComputedStyle(ui.undiscordBtn);
+	    if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return false;
+	    return true;
 	  };
+
+	  const isToolbarMounted = () => {
+	    if (!ui.undiscordBtn?.isConnected || ui.undiscordBtn.classList.contains('undiscord-floating')) return false;
+	    if (ui.undiscordBtn.parentElement === document.body) return false;
+	    return isUndiscordBtnVisible();
+	  };
+
+	  function isElementVisible(el) {
+	    if (!el?.isConnected) return false;
+	    const r = el.getBoundingClientRect();
+	    if (r.width < 4 || r.height < 4) return false;
+	    const style = getComputedStyle(el);
+	    if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return false;
+	    return true;
+	  }
+
+	  function scoreToolbar(el) {
+	    if (!isElementVisible(el)) return -1;
+	    let score = 0;
+	    const cls = String(el.className || '');
+	    const r = el.getBoundingClientRect();
+
+	    if (el.closest('[aria-label="Channel header"], section[aria-label="Channel header"], header[aria-label="Channel header"]')) score += 120;
+	    if (/toolbar/i.test(cls)) score += 25;
+
+	    const iconBtns = el.querySelectorAll(':scope > button, :scope > [role="button"]');
+	    score += Math.min(iconBtns.length, 6) * 8;
+
+	    if (r.top >= 0 && r.top < 160 && r.left > 200) score += 35;
+	    if (r.right > window.innerWidth * 0.35) score += 15;
+	    if (r.width > 500 || r.height > 72) score -= 40;
+
+	    const display = getComputedStyle(el).display;
+	    if (display === 'flex' || display === 'inline-flex') score += 10;
+
+	    return score;
+	  }
+
+	  function collectToolbarCandidates(root) {
+	    const seen = new Set();
+	    const candidates = [];
+
+	    function add(el) {
+	      if (!el || seen.has(el)) return;
+	      seen.add(el);
+	      const score = scoreToolbar(el);
+	      if (score >= 0) candidates.push({ el, score });
+	    }
+
+	    // Anchor off header icons (Search / Threads / Pins) — stable across class renames
+	    const headerIconLabels = ['Search', 'Threads', 'Pinned Messages', 'Pin', 'Notifications', 'Start Voice', 'Open Chat'];
+	    for (const label of headerIconLabels) {
+	      const btn = root.querySelector(`[aria-label*="${label}" i]`);
+	      if (!btn) continue;
+	      const toolbar = btn.closest('[class*="toolbar"], [class^="toolbar_"], [class*="toolBar"]');
+	      if (toolbar) add(toolbar);
+	    }
+
+	    const selectors = [
+	      '[aria-label="Channel header"] [class*="toolbar"]',
+	      '[aria-label="Channel header"] [class^="toolbar_"]',
+	      'section[aria-label="Channel header"] [class*="toolbar"]',
+	      '[class*="upperContainer"] [class*="toolbar"]',
+	      'main [class*="toolbar"]',
+	      '[class^="toolbar_"]',
+	      '[class^="toolbar-"]',
+	      '[class*="toolbar__"]',
+	      '[class*="-toolbar"]',
+	      '[role="toolbar"]',
+	    ];
+	    for (const sel of selectors) {
+	      root.querySelectorAll(sel).forEach(add);
+	    }
+
+	    candidates.sort((a, b) => b.score - a.score);
+	    return candidates;
+	  }
 
 	  function findToolbar() {
 	    const root = document.querySelector('#app-mount');
 	    if (!root) return null;
-
-	    // Discord renames hashed classes often (#779, #793, #750, PR #762)
-	    const selectors = [
-	      '[class*="upperContainer"] [class*="toolbar"]',
-	      '[class*="upperContainer"] [class^="toolbar_"]',
-	      '[class*="chat"] [class*="toolbar"]',
-	      '[class*="toolbar__"]',
-	      '[class^="toolbar_"]',
-	      '[class*="-toolbar"]',
-	      '[class^="toolbar"]',
-	    ];
-	    for (const sel of selectors) {
-	      const el = root.querySelector(sel);
-	      if (el) {
-	        const r = el.getBoundingClientRect();
-	        if (r.width > 0 && r.height > 0) return el;
-	      }
-	    }
-
-	    const candidates = root.querySelectorAll('[class*="toolbar"], [class^="toolbar_"], [class*="-toolbar"]');
-	    for (let i = candidates.length - 1; i >= 0; i--) {
-	      const r = candidates[i].getBoundingClientRect();
-	      if (r.width > 0 && r.height > 0) return candidates[i];
-	    }
-	    return candidates[candidates.length - 1] || null;
+	    const candidates = collectToolbarCandidates(root);
+	    return candidates[0]?.el || null;
 	  }
 
 	  function mountFloatingBtn() {
@@ -1754,31 +2041,43 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	    return true;
 	  }
 
-	  function mountBtn() {
+	  function tryMountToolbar() {
 	    const toolbar = findToolbar();
-	    if (toolbar) {
-	      ui.undiscordBtn.classList.remove('undiscord-floating');
-	      if (!toolbar.contains(ui.undiscordBtn)) toolbar.appendChild(ui.undiscordBtn);
-	      if (isUndiscordBtnVisible()) return true;
-	    }
-	    return mountFloatingBtn();
+	    if (!toolbar) return false;
+	    ui.undiscordBtn.classList.remove('undiscord-floating');
+	    if (!toolbar.contains(ui.undiscordBtn)) toolbar.appendChild(ui.undiscordBtn);
+	    return isUndiscordBtnVisible();
+	  }
+
+	  function mountBtn() {
+	    if (tryMountToolbar()) return true;
+	    if (!isUndiscordBtnVisible()) return mountFloatingBtn();
+	    return isToolbarMounted();
 	  }
 
 	  mountBtn();
 	  let mountTries = 0;
 	  const mountRetryTimer = setInterval(() => {
-	    mountBtn();
-	    if (isUndiscordBtnVisible() || ++mountTries >= 24) clearInterval(mountRetryTimer);
+	    if (tryMountToolbar()) {
+	      clearInterval(mountRetryTimer);
+	      return;
+	    }
+	    if (!isUndiscordBtnVisible()) mountFloatingBtn();
+	    if (++mountTries >= 48) clearInterval(mountRetryTimer);
 	  }, 2500);
 
-	  // watch for changes and re-mount button if necessary
+	  // Re-mount when Discord re-renders; keep trying to move off floating fallback
 	  const discordElm = document.querySelector('#app-mount');
 	  let observerThrottle = null;
 	  const observer = new MutationObserver((_mutationsList, _observer) => {
 	    if (observerThrottle) return;
 	    observerThrottle = setTimeout(() => {
 	      observerThrottle = null;
-	      if (!isUndiscordBtnVisible()) mountBtn();
+	      if (!discordElm?.contains(ui.undiscordBtn)) {
+	        mountBtn();
+	      } else if (!isToolbarMounted()) {
+	        tryMountToolbar() || (!isUndiscordBtnVisible() && mountFloatingBtn());
+	      }
 	    }, 800);
 	  });
 	  if (discordElm) observer.observe(discordElm, { attributes: false, childList: true, subtree: true });
@@ -1787,8 +2086,8 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	    // Class-based hide — inline display:none loses to themeCss `display:flex !important`
 	    const hidden = ui.undiscordWindow.classList.toggle('undiscord-hidden');
 	    ui.undiscordBtn.style.color = hidden
-	      ? 'var(--interactive-normal)'
-	      : 'var(--interactive-active)';
+	      ? 'var(--interactive-text-default, var(--interactive-normal))'
+	      : 'var(--interactive-text-hover, var(--interactive-active))';
 	  }
 
 	  // cached elements
@@ -1809,7 +2108,11 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	  }
 
 	  // register event listeners
-	  $('#toggleSidebar').onclick = ()=> ui.undiscordWindow.classList.toggle('hide-sidebar');
+	  $('#toggleSidebar').onclick = (e) => {
+	    e.preventDefault();
+	    e.stopPropagation();
+	    ui.undiscordWindow.classList.toggle('hide-sidebar');
+	  };
 	  $('button#start').onclick = startAction;
 	  $('button#stop').onclick = stopAction;
 	  $('button#clear').onclick = () => ui.logArea.innerHTML = '';

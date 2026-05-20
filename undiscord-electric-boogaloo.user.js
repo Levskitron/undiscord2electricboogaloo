@@ -535,8 +535,11 @@
                         <a href="{{WIKI}}/delay" title="Help" target="_blank" rel="noopener noreferrer">help</a>
                     </legend>
                     <div class="input-wrapper">
-                        <input id="searchDelay" type="range" value="30000" step="100" min="100" max="60000">
-                        <div id="searchDelayValue"></div>
+                        <input id="searchDelay" class="input" type="number" value="30" min="1" max="60" step="1" title="Seconds between search pages">
+                        <span class="info">sec</span>
+                    </div>
+                    <div class="sectionDescription">
+                        Pause between each search page (1–60 seconds). Default 30.
                     </div>
                 </fieldset>
                 <fieldset>
@@ -545,13 +548,12 @@
                         <a href="{{WIKI}}/delay" title="Help" target="_blank" rel="noopener noreferrer">help</a>
                     </legend>
                     <div class="input-wrapper">
-                        <input id="deleteDelay" type="range" value="1000" step="50" min="50" max="10000">
-                        <div id="deleteDelayValue"></div>
+                        <input id="deleteDelay" class="input" type="number" value="1" min="0.1" max="10" step="0.1" title="Seconds between each delete">
+                        <span class="info">sec</span>
                     </div>
                     <br>
                     <div class="sectionDescription">
-                        This will affect the speed in which the messages are deleted.
-                        Use the help link for more information.
+                        Pause between each delete (0.1–10 seconds). Default 1. Increase if you hit rate limits.
                     </div>
                 </fieldset>
                 <fieldset>
@@ -644,6 +646,39 @@
 	// Helpers
 	const wait = async ms => new Promise(done => setTimeout(done, ms));
 	const msToHMS = s => `${s / 3.6e6 | 0}h ${(s % 3.6e6) / 6e4 | 0}m ${(s % 6e4) / 1000 | 0}s`;
+
+	/** UI delay fields are in seconds; core options stay in milliseconds */
+	const formatDelaySeconds = (ms) => {
+	  const s = ms / 1000;
+	  return Number.isInteger(s) ? String(s) : s.toFixed(1);
+	};
+	const parseDelaySeconds = (raw, fallbackMs, minMs, maxMs) => {
+	  const s = parseFloat(String(raw).trim().replace(',', '.'));
+	  if (Number.isNaN(s)) return fallbackMs;
+	  const ms = Math.round(s * 1000);
+	  return Math.min(maxMs, Math.max(minMs, ms));
+	};
+
+	const SEARCH_DELAY_MS = { min: 1000, max: 60000, default: 30000 };
+	const DELETE_DELAY_MS = { min: 100, max: 10000, default: 1000 };
+
+	function syncDelayInput(id, ms, bounds) {
+	  if (!ui.undiscordWindow) return ms;
+	  const input = ui.undiscordWindow.querySelector(`#${id}`);
+	  if (!input) return ms;
+	  const clamped = Math.min(bounds.max, Math.max(bounds.min, ms));
+	  input.value = formatDelaySeconds(clamped);
+	  return clamped;
+	}
+
+	function readDelayInput(id, bounds) {
+	  if (!ui.undiscordWindow) return bounds.default;
+	  const input = ui.undiscordWindow.querySelector(`#${id}`);
+	  const ms = parseDelaySeconds(input.value, bounds.default, bounds.min, bounds.max);
+	  const clamped = syncDelayInput(id, ms, bounds);
+	  undiscordCore.options[id] = clamped;
+	  return clamped;
+	}
 	const escapeHTML = html => String(html).replace(/[&<"']/g, m => ({ '&': '&amp;', '<': '&lt;', '"': '&quot;', '\'': '&#039;' })[m]);
 	/** Wrap sensitive log fragments — styled by #undiscord.privacy-mode (retroactive via CSS) */
 	const redact = str => `<x>${escapeHTML(String(str ?? ''))}</x>`;
@@ -1193,7 +1228,7 @@
 	        this.stats.throttledCount++;
 	        this.stats.throttledTotalTime += w;
 	        this.options.deleteDelay = w; // increase delay
-	        log.warn(`Being rate limited by the API for ${w}ms! Adjusted delete delay to ${this.options.deleteDelay}ms.`);
+	        log.warn(`Being rate limited by the API for ${(w / 1000).toFixed(1)}s! Adjusted delete delay to ${formatDelaySeconds(this.options.deleteDelay)}s.`);
 	        this.printStats();
 	        log.verb(`Cooling down for ${w * 2}ms before retrying...`);
 	        if (!await this.interruptibleWait(w * 2)) return 'FAILED';
@@ -1239,7 +1274,7 @@
 
 	  printStats() {
 	    log.verb(
-	      `Delete delay: ${this.options.deleteDelay}ms, Search delay: ${this.options.searchDelay}ms`,
+	      `Delete delay: ${formatDelaySeconds(this.options.deleteDelay)}s, Search delay: ${formatDelaySeconds(this.options.searchDelay)}s`,
 	      `Last Ping: ${this.stats.lastPing}ms, Average Ping: ${this.stats.avgPing | 0}ms`,
 	    );
 	    log.verb(
@@ -1811,22 +1846,13 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	  $('input#verboseLog').onchange = () => onLogOptionChange('verbose');
 	  $('input#logDeletions').onchange = () => onLogOptionChange('deletions');
 
-	  // sync delays
-	  $('input#searchDelay').onchange = (e) => {
-	    const v = parseInt(e.target.value);
-	    if (v) undiscordCore.options.searchDelay = v;
-	  };
-	  $('input#deleteDelay').onchange = (e) => {
-	    const v = parseInt(e.target.value);
-	    if (v) undiscordCore.options.deleteDelay = v;
-	  };
+	  $('input#searchDelay').onchange = () => readDelayInput('searchDelay', SEARCH_DELAY_MS);
+	  $('input#deleteDelay').onchange = () => readDelayInput('deleteDelay', DELETE_DELAY_MS);
 
-	  $('input#searchDelay').addEventListener('input', (event) => {
-	    $('div#searchDelayValue').textContent = event.target.value + 'ms';
-	  });
-	  $('input#deleteDelay').addEventListener('input', (event) => {
-	    $('div#deleteDelayValue').textContent = event.target.value + 'ms';
-	  });
+	  undiscordCore.options.searchDelay = SEARCH_DELAY_MS.default;
+	  undiscordCore.options.deleteDelay = DELETE_DELAY_MS.default;
+	  syncDelayInput('searchDelay', SEARCH_DELAY_MS.default, SEARCH_DELAY_MS);
+	  syncDelayInput('deleteDelay', DELETE_DELAY_MS.default, DELETE_DELAY_MS);
 
 	  // import json
 	  const fileSelection = $('input#importJsonInput');
@@ -1918,14 +1944,9 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	      ui.percent.innerHTML = '...';
 	    }
 
-	    // update delays
-	    const searchDelayInput = $('input#searchDelay');
-	    searchDelayInput.value = undiscordCore.options.searchDelay;
-	    $('div#searchDelayValue').textContent = undiscordCore.options.searchDelay+'ms';
-
-	    const deleteDelayInput = $('input#deleteDelay');
-	    deleteDelayInput.value = undiscordCore.options.deleteDelay;
-	    $('div#deleteDelayValue').textContent = undiscordCore.options.deleteDelay+'ms';
+	    // update delays (rate limit may have increased them mid-run)
+	    syncDelayInput('searchDelay', undiscordCore.options.searchDelay, SEARCH_DELAY_MS);
+	    syncDelayInput('deleteDelay', undiscordCore.options.deleteDelay, DELETE_DELAY_MS);
 	  };
 
 	  undiscordCore.onStop = (state, stats) => {
@@ -1958,8 +1979,8 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	  const minDate = $('input#minDate').value.trim();
 	  const maxDate = $('input#maxDate').value.trim();
 	  //advanced
-	  const searchDelay = parseInt($('input#searchDelay').value.trim());
-	  const deleteDelay = parseInt($('input#deleteDelay').value.trim());
+	  const searchDelay = readDelayInput('searchDelay', SEARCH_DELAY_MS);
+	  const deleteDelay = readDelayInput('deleteDelay', DELETE_DELAY_MS);
 	  const emptyPageRetries = parseInt($('input#emptyPageRetries').value.trim(), 10);
 	  syncLogOptionsFromUI();
 

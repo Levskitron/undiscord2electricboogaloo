@@ -819,6 +819,14 @@
 
 	    if (this._userStopped) {
 	      log.warn('Stopped by you!');
+	    } else if (grandTotal > 0 && !this.isComplete()) {
+	      log.warn(
+	        'Run ended before every search match was processed. Large jobs often need multiple runs,',
+	        'higher Empty page retries (Advanced), or a lower Search delay. Discord search can also return empty pages mid-run.'
+	      );
+	    }
+
+	    if (delCount + failCount + skipCount > 0 || grandTotal > 0) {
 	      log.info(`Summary: ${delCount} deleted, ${failCount} failed, ${skipCount} skipped (${grandTotal} reported by Discord).`);
 	    }
 

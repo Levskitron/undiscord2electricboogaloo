@@ -34,9 +34,10 @@ What you delete, and what filters you use, is **your business**. This project is
 ## Features
 
 - **Run profiles** — **Fast wipe** (default), **Careful wipe**, **Review photos & backup**, **Server wipe (all channels)**, or **Custom**.
-- **Server-wide deletion** — discovers text channels, active/archived threads, and forums via API (sidebar DOM fallback), then batch-deletes your messages in each.
+- **Server-wide deletion** — discovers text channels, active/archived threads, and forums via API (sidebar DOM fallback), optional **pre-count** estimate, **checkpoint resume**, then batch-deletes per channel.
+- **Session & logs** — hourly auto-save/clear, save log on stop, optional messages-only exports to `Undiscord_Logs/`.
 - **Bulk message deletion** — search and delete your messages in a server channel or DM, with progress and time estimates.
-- **Rich filtering** — text search, `has: link` / `has: file`, regex patterns, pinned messages, message ID ranges, date ranges, and **inverse keep** rules (e.g. keep messages with files, delete the rest).
+- **Rich filtering** — text search, `has: link` / `has: file`, regex patterns, pinned messages, message ID ranges, date ranges, **inverse keep** rules, and optional **bot/app messages** (off by default).
 - **Media review mode** — pause every batch to preview attachments, download backups (`Undiscord_Media/…` via Tampermonkey), and choose what to delete or keep.
 - **Batch jobs** — comma-separated channel IDs, or import `messages/index.json` from a [Discord data export](https://support.discord.com/hc/en-us/articles/360004957031) to wipe many channels at once (use **Fast wipe** for multi-channel).
 - **Rate-limit aware** — hybrid time-remaining estimate, auto-adjusting delays on 429, empty-page retries, and network retry on 503/transient failures.

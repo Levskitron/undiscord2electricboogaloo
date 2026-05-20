@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Undiscord 2: Electric Boogaloo
 // @description     Versatile Undiscord fork — fast bulk wipe or interactive media backup & delete.
-// @version         1.2.0
+// @version         1.3.0
 // @author          Levskitron
 // @homepageURL     https://github.com/Levskitron/undiscord2electricboogaloo
 // @supportURL      https://github.com/Levskitron/undiscord2electricboogaloo/issues
@@ -16,7 +16,9 @@
 	'use strict';
 
 	/* rollup-plugin-baked-env */
-	const VERSION = '1.2.0';
+	const VERSION = '1.3.0';
+	const CHECKPOINT_KEY = 'undiscord_eb_checkpoint_v1';
+	const LOG_MAINTENANCE_INTERVAL_MS = 3600000;
 	const TOOL_NAME = 'Undiscord 2: Electric Boogaloo';
 	const WINDOW_WIDTH = 960;
 
@@ -645,6 +647,13 @@
 }
 #undiscord .profile-only-custom { display: none; }
 #undiscord[data-profile="custom"] .profile-only-custom { display: block; }
+#undiscord .checkpoint-banner {
+    background: rgba(250, 166, 26, 0.12);
+    border: 1px solid rgba(250, 166, 26, 0.35);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+}
 `);
 
 	var mainCss = (`
@@ -780,6 +789,13 @@
                                 <button type="button" class="field-btn" id="getChannel">Current</button>
                             </div>
                             <p class="field-hint">Use commas for multiple channels, or enable server-wide wipe below.</p>
+                            <div id="checkpointBanner" class="checkpoint-banner" style="display: none;">
+                                <p class="field-hint field-hint-warn" id="checkpointBannerText">Paused run — channels remaining.</p>
+                                <div class="field-row" style="margin-top: 8px;">
+                                    <button type="button" class="field-btn" id="resumeCheckpoint">Resume</button>
+                                    <button type="button" class="field-btn" id="discardCheckpoint">Discard</button>
+                                </div>
+                            </div>
                             <div class="check-list">
                                 <label title="Discover every text channel, thread, and forum in this server via API (and sidebar fallback)">
                                     <input id="deleteAllChannels" type="checkbox">
@@ -820,6 +836,10 @@
                                 <label title="When enabled, pinned messages are deleted too">
                                     <input id="includePinned" type="checkbox" checked>
                                     <span>Delete pinned messages</span>
+                                </label>
+                                <label title="When off, bot and webhook messages are skipped (avoids permission errors). When on, they are included if search returns them.">
+                                    <input id="includeBotMessages" type="checkbox">
+                                    <span>Include bot / app messages</span>
                                 </label>
                             </div>
                         </div>
@@ -924,6 +944,46 @@
                                 <input type="file" id="importJsonInput" accept="application/json,.json">
                             </div>
                             <p class="field-hint">From a Discord data export: choose <code>messages/index.json</code> to fill channel IDs for a full archive wipe.</p>
+                        </div>
+                    </div>
+                </details>
+
+                <details class="sidebar-section">
+                    <summary>Session &amp; logs</summary>
+                    <div class="sidebar-section-body">
+                        <p class="field-group-title">Log files</p>
+                        <div class="check-list">
+                            <label title="Every hour: save log to a .txt file, then clear the log panel">
+                                <input id="autoLogHourly" type="checkbox">
+                                <span>Auto-save &amp; clear log hourly</span>
+                            </label>
+                            <label style="margin-left: 20px;">
+                                <input id="autoLogHourlyMessagesOnly" type="checkbox">
+                                <span>Messages only (hourly)</span>
+                            </label>
+                            <label title="When the run ends or you press Stop, save the log to a .txt file">
+                                <input id="autoSaveLogOnStop" type="checkbox">
+                                <span>Auto-save log on stop / finish</span>
+                            </label>
+                            <label style="margin-left: 20px;">
+                                <input id="autoSaveLogMessagesOnly" type="checkbox">
+                                <span>Messages only (on stop)</span>
+                            </label>
+                            <label title="Clear the log panel every hour without saving">
+                                <input id="autoClearLogHourly" type="checkbox">
+                                <span>Auto-clear log hourly (no save)</span>
+                            </label>
+                        </div>
+                        <p class="field-group-title">Server wipe</p>
+                        <div class="check-list">
+                            <label title="Before a server-wide run, scan each channel and show an estimated message count">
+                                <input id="preCountServerWipe" type="checkbox" checked>
+                                <span>Pre-count messages before server wipe</span>
+                            </label>
+                            <label title="If you stop mid server wipe, save progress so you can resume remaining channels later">
+                                <input id="saveCheckpoint" type="checkbox" checked>
+                                <span>Save checkpoint (resume later)</span>
+                            </label>
                         </div>
                     </div>
                 </details>
@@ -1064,6 +1124,144 @@
 	var logFn; // custom console.log function
 	const setLogFn = (fn) => logFn = fn;
 
+	function logTimestampForFilename() {
+	  const now = new Date();
+	  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
+	}
+
+	function saveLogToFile(messagesOnly = false) {
+	  const logArea = ui.logArea || document.querySelector('#logArea');
+	  if (!logArea) return false;
+	  const entries = logArea.querySelectorAll('div.log');
+	  const lines = [];
+	  entries.forEach(entry => {
+	    if (messagesOnly && !entry.classList.contains('log-debug')) return;
+	    const text = entry.innerText?.trim();
+	    if (text) lines.push(text.replace(/\n/g, ' '));
+	  });
+	  if (!lines.length) return false;
+
+	  const text = lines.join('\r\n');
+	  const ts = logTimestampForFilename();
+	  const filename = messagesOnly
+	    ? `Undiscord_Logs/undiscord_messages_${ts}.txt`
+	    : `Undiscord_Logs/undiscord_log_${ts}.txt`;
+	  const blobUrl = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+
+	  if (typeof GM_download !== 'undefined') {
+	    GM_download({
+	      url: blobUrl,
+	      name: filename,
+	      saveAs: false,
+	      onload: () => URL.revokeObjectURL(blobUrl),
+	      onerror: () => {
+	        URL.revokeObjectURL(blobUrl);
+	        const a = document.createElement('a');
+	        a.href = blobUrl;
+	        a.download = filename.split('/').pop();
+	        a.click();
+	      },
+	    });
+	  } else {
+	    const a = document.createElement('a');
+	    a.href = blobUrl;
+	    a.download = filename.split('/').pop();
+	    a.click();
+	    URL.revokeObjectURL(blobUrl);
+	  }
+	  return true;
+	}
+
+	function loadCheckpoint() {
+	  try {
+	    const raw = localStorage.getItem(CHECKPOINT_KEY);
+	    if (!raw) return null;
+	    const data = JSON.parse(raw);
+	    if (!data || data.v !== 1 || !Array.isArray(data.remainingJobs) || !data.remainingJobs.length) return null;
+	    return data;
+	  } catch {
+	    return null;
+	  }
+	}
+
+	function saveCheckpoint(data) {
+	  try {
+	    localStorage.setItem(CHECKPOINT_KEY, JSON.stringify({ v: 1, savedAt: Date.now(), ...data }));
+	    updateCheckpointBanner();
+	  } catch (err) {
+	    log.verb('Could not save checkpoint:', err);
+	  }
+	}
+
+	function clearCheckpoint() {
+	  try { localStorage.removeItem(CHECKPOINT_KEY); } catch {}
+	  updateCheckpointBanner();
+	}
+
+	function updateCheckpointBanner() {
+	  if (!ui.undiscordWindow) return;
+	  const banner = ui.undiscordWindow.querySelector('#checkpointBanner');
+	  const text = ui.undiscordWindow.querySelector('#checkpointBannerText');
+	  const cp = loadCheckpoint();
+	  if (!banner || !text) return;
+	  if (!cp) {
+	    banner.style.display = 'none';
+	    return;
+	  }
+	  const n = cp.remainingJobs.length;
+	  const done = cp.completedChannels || 0;
+	  const total = (cp.totalChannels || done + n);
+	  text.textContent = `Paused server wipe: ${n} channel(s) remaining (${done}/${total} done). Saved ${new Date(cp.savedAt).toLocaleString()}.`;
+	  banner.style.display = 'block';
+	}
+
+	function applyCheckpointToForm(cp) {
+	  if (!cp || !ui.undiscordWindow) return;
+	  const $ = s => ui.undiscordWindow.querySelector(s);
+	  if (cp.guildId) $('input#guildId').value = cp.guildId;
+	  if (cp.authorId) $('input#authorId').value = cp.authorId;
+	  if (cp.filters) {
+	    const f = cp.filters;
+	    if (f.content != null) $('input#search').value = f.content;
+	    if (f.hasLink != null) $('input#hasLink').checked = !!f.hasLink;
+	    if (f.hasFile != null) $('input#hasFile').checked = !!f.hasFile;
+	    if (f.includePinned != null) $('input#includePinned').checked = !!f.includePinned;
+	    if (f.includeBotMessages != null) $('input#includeBotMessages').checked = !!f.includeBotMessages;
+	    if (f.pattern != null) $('input#pattern').value = f.pattern;
+	    if (f.skipLink != null) $('input#skipLink').checked = !!f.skipLink;
+	    if (f.skipFile != null) $('input#skipFile').checked = !!f.skipFile;
+	    if (f.skipPinned != null) $('input#skipPinned').checked = !!f.skipPinned;
+	    if (f.includeNsfw != null) $('input#includeNsfw').checked = !!f.includeNsfw;
+	  }
+	  $('input#deleteAllChannels').checked = true;
+	  syncDeleteAllChannelsUI();
+	  if (cp.profileId) {
+	    $('select#runProfile').value = cp.profileId;
+	    applyRunProfileToUI(cp.profileId);
+	  }
+	}
+
+	function readFiltersSnapshotFromUI() {
+	  if (!ui.undiscordWindow) return {};
+	  const $ = s => ui.undiscordWindow.querySelector(s);
+	  return {
+	    content: $('input#search')?.value?.trim() || '',
+	    hasLink: !!$('input#hasLink')?.checked,
+	    hasFile: !!$('input#hasFile')?.checked,
+	    includePinned: !!$('input#includePinned')?.checked,
+	    includeBotMessages: !!$('input#includeBotMessages')?.checked,
+	    pattern: $('input#pattern')?.value || '',
+	    skipLink: !!$('input#skipLink')?.checked,
+	    skipFile: !!$('input#skipFile')?.checked,
+	    skipPinned: !!$('input#skipPinned')?.checked,
+	    includeNsfw: !!$('input#includeNsfw')?.checked,
+	    minId: $('input#minId')?.value?.trim() || '',
+	    maxId: $('input#maxId')?.value?.trim() || '',
+	    minDate: $('input#minDate')?.value?.trim() || '',
+	    maxDate: $('input#maxDate')?.value?.trim() || '',
+	  };
+	}
+
 	// Helpers
 	const wait = async ms => new Promise(done => setTimeout(done, ms));
 	const msToHMS = s => `${s / 3.6e6 | 0}h ${(s % 3.6e6) / 6e4 | 0}m ${(s % 6e4) / 1000 | 0}s`;
@@ -1159,6 +1357,8 @@
 	    searchDelayMs: 30000,
 	    deleteDelayMs: 1500,
 	    emptyPageRetries: 3,
+	    preCountServerWipe: true,
+	    saveCheckpoint: true,
 	    showMediaSection: false,
 	  },
 	  custom: {
@@ -1221,6 +1421,14 @@
 	    serverName: 'Server',
 	    channelName: 'Channel',
 	    unarchiveThreads: false,
+	    includeBotMessages: false,
+	    autoLogHourly: false,
+	    autoLogHourlyMessagesOnly: false,
+	    autoSaveLogOnStop: false,
+	    autoSaveLogMessagesOnly: false,
+	    autoClearLogHourly: false,
+	    preCountServerWipe: true,
+	    saveCheckpoint: true,
 	  };
 
 	  state = {
@@ -1247,6 +1455,7 @@
 	    _batchIndex: 0,
 	    _batchTotal: 0,
 	    _avgDeletePerPage: 25,
+	    lastLogMaintenanceTime: 0,
 	  };
 
 	  stats = {
@@ -1270,6 +1479,7 @@
 	  _activeRequestController = null;
 	  _pendingWait = null;
 	  _mediaModalState = null;
+	  _checkpointContext = null;
 
 	  resetState() {
 	    this.state = {
@@ -1296,6 +1506,7 @@
 	      _batchIndex: 0,
 	      _batchTotal: 0,
 	      _avgDeletePerPage: 25,
+	      lastLogMaintenanceTime: Date.now(),
 	    };
 
 	    this._skipHintShown = false;
@@ -1307,6 +1518,20 @@
 
 	  processedCount() {
 	    return this.state.delCount + this.state.failCount + this.state.skipCount;
+	  }
+
+	  maybeHourlyLogMaintenance() {
+	    const now = Date.now();
+	    if (!this.state.lastLogMaintenanceTime) this.state.lastLogMaintenanceTime = now;
+	    if (now - this.state.lastLogMaintenanceTime < LOG_MAINTENANCE_INTERVAL_MS) return;
+	    this.state.lastLogMaintenanceTime = now;
+	    if (this.options.autoLogHourly) {
+	      if (saveLogToFile(this.options.autoLogHourlyMessagesOnly)) log.info('Hourly auto-save — log file written.');
+	      if (ui.logArea) ui.logArea.innerHTML = '';
+	    } else if (this.options.autoClearLogHourly && ui.logArea) {
+	      ui.logArea.innerHTML = '';
+	      log.info('Hourly log clear.');
+	    }
 	  }
 
 	  cancelInFlightRequest() {
@@ -1353,6 +1578,9 @@
 	    if (this.options.content && !content.toLowerCase().includes(String(this.options.content).toLowerCase())) return false;
 	    if (this.options.hasFile && !(Array.isArray(message.attachments) && message.attachments.length > 0)) return false;
 	    if (this.options.hasLink && !/(https?:\/\/[^\s]+)/i.test(content)) return false;
+	    const type = Number(message?.type);
+	    if (type === 20) return false;
+	    if (!this.options.includeBotMessages && message?.author?.bot) return false;
 	    return true;
 	  }
 
@@ -1514,6 +1742,7 @@
 	    log.info(`Running batch with ${queue.length} channel job(s)…`);
 	    this.state._batchActive = true;
 	    this.state._batchTotal = queue.length;
+	    const checkpointCtx = this._checkpointContext;
 
 	    for (let i = 0; i < queue.length; i++) {
 	      const job = queue[i];
@@ -1531,6 +1760,28 @@
 	      if (!this.state.running) break;
 
 	      log.info(`Channel job finished (${i + 1}/${queue.length}).`);
+
+	      if (this.options.saveCheckpoint && checkpointCtx) {
+	        const remaining = queue.slice(i + 1).map(j => ({
+	          guildId: j.guildId || this.options.guildId,
+	          channelId: j.channelId,
+	          channelName: j.channelName || j.channelId,
+	        }));
+	        if (remaining.length) {
+	          saveCheckpoint({
+	            profileId: checkpointCtx.profileId,
+	            guildId: checkpointCtx.guildId,
+	            authorId: checkpointCtx.authorId,
+	            filters: checkpointCtx.filters,
+	            totalChannels: checkpointCtx.totalChannels,
+	            completedChannels: i + 1,
+	            remainingJobs: remaining,
+	          });
+	        } else {
+	          clearCheckpoint();
+	        }
+	      }
+
 	      this.resetState();
 	      this.options.askForConfirmation = false;
 	      this.state.running = true;
@@ -1540,6 +1791,8 @@
 	    }
 
 	    this.state._batchActive = false;
+	    this._checkpointContext = null;
+	    if (this.state.running || !this._userStopped) clearCheckpoint();
 	    log.info('Batch finished.');
 	    this.state.running = false;
 	  }
@@ -1621,6 +1874,10 @@
 	      log.info(`Rate limits: ${this.stats.throttledCount}×, total wait ${msToHMS(this.stats.throttledTotalTime)}.`);
 	    }
 
+	    if (this.options.autoSaveLogOnStop) {
+	      if (saveLogToFile(this.options.autoSaveLogMessagesOnly)) log.info('Log saved to file.');
+	    }
+
 	    log.success(`Finished at ${this.stats.endTime.toLocaleString()} (${elapsed})`);
 	    if (this.onStop) this.onStop(this.state, this.stats);
 	  }
@@ -1658,6 +1915,7 @@
 	    try {
 	    do {
 	      this.state.iterations++;
+	      this.maybeHourlyLogMaintenance();
 
 	      log.debug('Fetching messages...');
 	      // Search messages
@@ -2043,6 +2301,7 @@
 	    try {
 	      do {
 	        this.state.iterations++;
+	        this.maybeHourlyLogMaintenance();
 	        log.debug('Fetching messages...');
 	        await this.search();
 	        if (!this.state.running) break;
@@ -2362,6 +2621,10 @@
 	    // we can only delete some types of messages, system messages are not deletable.
 	    // type 46 = polls (self-deletable) — PR #741
 	    let messagesToDelete = discoveredMessages.filter(msg => msg.type === 0 || msg.type === 46 || (msg.type >= 6 && msg.type <= 19));
+	    messagesToDelete = messagesToDelete.filter(msg => msg.type !== 20);
+	    if (!this.options.includeBotMessages) {
+	      messagesToDelete = messagesToDelete.filter(msg => !msg.author?.bot);
+	    }
 	    messagesToDelete = messagesToDelete.filter(msg => msg.pinned ? this.options.includePinned : true);
 
 	    if (this.options.skipLink || this.options.skipFile || this.options.skipPinned) {
@@ -3150,6 +3413,10 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t||''},'*');
 	  if (askEl && profile.askForConfirmation !== undefined) askEl.checked = profile.askForConfirmation;
 	  const allCh = ui.undiscordWindow.querySelector('#deleteAllChannels');
 	  if (allCh && profile.deleteAllChannels !== undefined) allCh.checked = profile.deleteAllChannels;
+	  const preCount = ui.undiscordWindow.querySelector('#preCountServerWipe');
+	  if (preCount && profile.preCountServerWipe !== undefined) preCount.checked = profile.preCountServerWipe;
+	  const saveCp = ui.undiscordWindow.querySelector('#saveCheckpoint');
+	  if (saveCp && profile.saveCheckpoint !== undefined) saveCp.checked = profile.saveCheckpoint;
 	  syncDeleteAllChannelsUI();
 	}
 
@@ -3162,6 +3429,73 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t||''},'*');
 	    chInput.placeholder = on ? 'Auto — all server channels' : 'Channel, or comma-separated';
 	  }
 	}
+
+	async function estimateChannelMessageCount(authToken, guildId, channelId, filters) {
+	  const ch = String(channelId || '').trim();
+	  if (!ch) return { count: 0, method: 'invalid' };
+
+	  const useGuild = guildId && guildId !== '@me';
+	  const searchUrl = useGuild
+	    ? `https://discord.com/api/v9/guilds/${guildId}/messages/search?`
+	    : `https://discord.com/api/v9/channels/${ch}/messages/search?`;
+
+	  const params = [
+	    ['author_id', filters.authorId || undefined],
+	    ['channel_id', useGuild ? ch : undefined],
+	    ['min_id', filters.minId ? toSnowflake(filters.minId) : undefined],
+	    ['max_id', filters.maxId ? toSnowflake(filters.maxId) : undefined],
+	    ['sort_by', 'timestamp'],
+	    ['sort_order', 'desc'],
+	    ['offset', 0],
+	    ['has', filters.hasLink ? 'link' : undefined],
+	    ['has', filters.hasFile ? 'file' : undefined],
+	    ['content', filters.content || undefined],
+	    ['include_nsfw', filters.includeNsfw ? true : undefined],
+	  ];
+
+	  for (let attempt = 0; attempt < 4; attempt++) {
+	    try {
+	      const resp = await fetch(searchUrl + queryString(params), {
+	        headers: { Authorization: authToken },
+	      });
+	      if (resp.status === 202) {
+	        const body = await resp.json().catch(() => ({}));
+	        await wait(Math.max(500, (Number(body?.retry_after) || 1) * 1000));
+	        continue;
+	      }
+	      if (resp.status === 429) {
+	        const body = await resp.json().catch(() => ({}));
+	        await wait(Math.max(500, (Number(body?.retry_after) || 1) * 1000));
+	        continue;
+	      }
+	      if (resp.ok) {
+	        const data = await resp.json();
+	        return { count: Math.max(0, Number(data?.total_results || 0)), method: 'search_total' };
+	      }
+	      return { count: 0, method: `error_${resp.status}` };
+	    } catch {
+	      if (attempt >= 3) return { count: 0, method: 'network_error' };
+	      await wait(400);
+	    }
+	  }
+	  return { count: 0, method: 'timeout' };
+	}
+
+	async function preCountServerChannels(authToken, guildId, channelInfos, filters) {
+	  let total = 0;
+	  for (let i = 0; i < channelInfos.length; i++) {
+	    const info = channelInfos[i];
+	    const ch = info.id;
+	    const name = info.name ? `#${info.name}` : ch;
+	    const est = await estimateChannelMessageCount(authToken, guildId, ch, filters);
+	    total += est.count;
+	    log.info(`Pre-count [${i + 1}/${channelInfos.length}] ${name}: ~${est.count} (${est.method})`);
+	    await wait(350);
+	  }
+	  return { total };
+	}
+
+	let resumeFromCheckpoint = false;
 
 	function readPipelineFromUI() {
 	  const profileId = ui.undiscordWindow?.querySelector('#runProfile')?.value || 'fastWipe';
@@ -3448,7 +3782,16 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t||''},'*');
 	  $('button#clear').onclick = () => ui.logArea.innerHTML = '';
 	  $('select#runProfile').onchange = (e) => applyRunProfileToUI(e.target.value);
 	  $('input#deleteAllChannels').onchange = syncDeleteAllChannelsUI;
+	  $('button#resumeCheckpoint').onclick = () => {
+	    resumeFromCheckpoint = true;
+	    startAction();
+	  };
+	  $('button#discardCheckpoint').onclick = () => {
+	    clearCheckpoint();
+	    log.info('Checkpoint discarded.');
+	  };
 	  applyRunProfileToUI('fastWipe');
+	  updateCheckpointBanner();
 
 	  let lastRoutePath = location.pathname;
 	  function tryAutofillFromRoute() {
@@ -3617,11 +3960,14 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t||''},'*');
 
 	async function startAction() {
 	  console.log(PREFIX, 'startAction');
+	  const resuming = resumeFromCheckpoint;
+	  resumeFromCheckpoint = false;
+
 	  // general
 	  const authorId = $('input#authorId').value.trim();
 	  const guildId = $('input#guildId').value.trim();
-	  const deleteAllChannels = $('input#deleteAllChannels').checked;
-	  let channelIds = deleteAllChannels
+	  const deleteAllChannels = resuming ? true : $('input#deleteAllChannels').checked;
+	  let channelIds = deleteAllChannels && !resuming
 	    ? []
 	    : $('input#channelId').value.trim().split(/\s*,\s*/).filter(Boolean);
 	  const includeNsfw = $('input#includeNsfw').checked;
@@ -3653,6 +3999,14 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t||''},'*');
 	    ? $('input#askConfirmation').checked
 	    : (profile.askForConfirmation ?? false);
 	  const unarchiveThreads = $('input#unarchiveThreads').checked;
+	  const includeBotMessages = $('input#includeBotMessages').checked;
+	  const autoLogHourly = $('input#autoLogHourly').checked;
+	  const autoLogHourlyMessagesOnly = $('input#autoLogHourlyMessagesOnly').checked;
+	  const autoSaveLogOnStop = $('input#autoSaveLogOnStop').checked;
+	  const autoSaveLogMessagesOnly = $('input#autoSaveLogMessagesOnly').checked;
+	  const autoClearLogHourly = $('input#autoClearLogHourly').checked;
+	  const preCountServerWipe = $('input#preCountServerWipe').checked;
+	  const saveCheckpoint = $('input#saveCheckpoint').checked;
 	  const { serverName, channelName } = getDiscordContextNames();
 	  syncLogOptionsFromUI();
 
@@ -3674,7 +4028,19 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t||''},'*');
 	  if (!guildId) return log.error('You must fill the "Server ID" field!');
 
 	  let channelInfos = [];
-	  if (deleteAllChannels) {
+
+	  if (resuming) {
+	    const cp = loadCheckpoint();
+	    if (!cp) return log.error('No saved checkpoint to resume.');
+	    applyCheckpointToForm(cp);
+	    channelInfos = cp.remainingJobs.map(j => ({
+	      id: j.channelId,
+	      name: j.channelName || '',
+	      source: 'checkpoint',
+	    }));
+	    channelIds = channelInfos.map(c => c.id).filter(Boolean);
+	    log.info(`Resuming server wipe — ${channelIds.length} channel(s) remaining.`);
+	  } else if (deleteAllChannels) {
 	    log.info('Discovering all message channels in this server…');
 	    channelInfos = await getServerMessageChannels(guildId, authToken);
 	    channelIds = channelInfos.map(c => c.id).filter(Boolean);
@@ -3688,6 +4054,25 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t||''},'*');
 	    log.info(`Server wipe: ${channelIds.length} channel(s) queued.`);
 	    if ($('input#verboseLog').checked) log.verb('Discovery breakdown:', bySource);
 	    log.warn('Server-wide deletion is slow and rate-limit sensitive. Keep Delete delay ≥ 1.5s.');
+
+	    if (preCountServerWipe) {
+	      const filterSnap = {
+	        authorId,
+	        ...readFiltersSnapshotFromUI(),
+	        minId: minId || minDate || undefined,
+	        maxId: maxId || maxDate || undefined,
+	      };
+	      log.info('Pre-counting messages (one quick search per channel)…');
+	      const { total } = await preCountServerChannels(authToken, guildId, channelInfos, filterSnap);
+	      log.info(`Estimated total: ~${total} messages across ${channelIds.length} channels.`);
+	      const proceed = await ask(
+	        `Proceed with server wipe?\n\nEstimated ~${total} matching messages in ${channelIds.length} channels.\n\nThis can take a long time and may trigger rate limits.`
+	      );
+	      if (!proceed) {
+	        log.warn('Server wipe cancelled before start.');
+	        return;
+	      }
+	    }
 	  }
 
 	  // clear logArea
@@ -3723,6 +4108,14 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t||''},'*');
 	    serverName,
 	    channelName,
 	    unarchiveThreads,
+	    includeBotMessages,
+	    autoLogHourly,
+	    autoLogHourlyMessagesOnly,
+	    autoSaveLogOnStop,
+	    autoSaveLogMessagesOnly,
+	    autoClearLogHourly,
+	    preCountServerWipe,
+	    saveCheckpoint,
 	  };
 
 	  if (pipeline === 'mediaReview') {
@@ -3745,6 +4138,18 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t||''},'*');
 	        serverName,
 	      };
 	    });
+
+	    if (saveCheckpoint && deleteAllChannels) {
+	      undiscordCore._checkpointContext = {
+	        profileId,
+	        guildId,
+	        authorId,
+	        filters: readFiltersSnapshotFromUI(),
+	        totalChannels: jobs.length,
+	      };
+	    } else {
+	      undiscordCore._checkpointContext = null;
+	    }
 
 	    try {
 	      await undiscordCore.runBatch(jobs);

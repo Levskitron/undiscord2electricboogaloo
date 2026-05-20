@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Undiscord 2: Electric Boogaloo
-// @description     An overhauled, fixed version of the original Undiscord for bulk message deletion.
-// @version         1.0.0
+// @description     Versatile Undiscord fork — fast bulk wipe or interactive media backup & delete.
+// @version         1.1.0
 // @author          Levskitron
 // @homepageURL     https://github.com/Levskitron/undiscord2electricboogaloo
 // @supportURL      https://github.com/Levskitron/undiscord2electricboogaloo/issues
@@ -9,14 +9,14 @@
 // @license         MIT
 // @namespace       https://github.com/Levskitron/undiscord2electricboogaloo
 // @icon            https://victornpb.github.io/undiscord/images/icon128.png
-// @grant           none
+// @grant           GM_download
 // @attribution     Original project (https://github.com/victornpb/undiscord)
 // ==/UserScript==
 (function () {
 	'use strict';
 
 	/* rollup-plugin-baked-env */
-	const VERSION = '1.0.0';
+	const VERSION = '1.1.0';
 	const TOOL_NAME = 'Undiscord 2: Electric Boogaloo';
 	const WINDOW_WIDTH = 960;
 
@@ -521,6 +521,130 @@
 #undiscord .log-warn { color: #faa61a !important; }
 #undiscord .log-error { color: #f04747 !important; }
 #undiscord .log-success { color: #43b581 !important; }
+
+/* Media review modal */
+#undiscord #undiscord-media-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 100001;
+    background: rgba(0, 0, 0, 0.85);
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+}
+#undiscord #undiscord-media-modal.open { display: flex; }
+#undiscord #undiscord-media-modal .media-modal-panel {
+    background: #2b2d31;
+    border: 1px solid #1e1f22;
+    border-radius: 8px;
+    width: min(920px, 96vw);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+#undiscord #undiscord-media-modal .media-modal-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #1e1f22;
+    flex-shrink: 0;
+}
+#undiscord #undiscord-media-modal .media-modal-header h4 {
+    margin: 0 0 6px;
+    color: #00b0f4;
+    font-size: 16px;
+}
+#undiscord #undiscord-media-modal .media-modal-hint {
+    font-size: 12px;
+    color: #949ba4;
+    line-height: 1.4;
+}
+#undiscord #undiscord-media-modal .media-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+    padding: 16px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 120px;
+}
+#undiscord #undiscord-media-modal .media-card {
+    position: relative;
+    border: 2px solid #3f4147;
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: pointer;
+    background: #111214;
+    aspect-ratio: 1;
+}
+#undiscord #undiscord-media-modal .media-card img,
+#undiscord #undiscord-media-modal .media-card video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+#undiscord #undiscord-media-modal .media-card.selected {
+    border-color: #23a559;
+    box-shadow: 0 0 0 2px #23a559;
+}
+#undiscord #undiscord-media-modal .media-card.selected::after {
+    content: "✓";
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: #23a559;
+    color: #fff;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 12px;
+    line-height: 20px;
+    text-align: center;
+    font-weight: bold;
+}
+#undiscord #undiscord-media-modal .media-badge {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    font-size: 9px;
+    padding: 2px 5px;
+    border-radius: 3px;
+}
+#undiscord #undiscord-media-modal .media-modal-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid #1e1f22;
+    flex-shrink: 0;
+}
+#undiscord #undiscord-media-modal .media-modal-footer button {
+    flex: 1 1 auto;
+    min-width: 120px;
+    font-size: 12px;
+    padding: 8px 10px;
+}
+#undiscord #undiscord-media-modal .media-btn-safe {
+    background: #4e5058 !important;
+    color: #fff !important;
+}
+#undiscord #undiscord-media-modal .media-btn-danger {
+    background: #da373c !important;
+    color: #fff !important;
+}
+#undiscord .profile-hint {
+    font-size: 12px;
+    color: #949ba4;
+    line-height: 1.45;
+    margin: 0 0 12px;
+}
+#undiscord .profile-only-custom { display: none; }
+#undiscord[data-profile="custom"] .profile-only-custom { display: block; }
 `);
 
 	var mainCss = (`
@@ -591,6 +715,31 @@
     <div class="window-body" style="display: flex; flex-direction: row;">
         <div class="sidebar">
             <div class="sidebar-nav scroll">
+                <details class="sidebar-section" open>
+                    <summary>Run profile</summary>
+                    <div class="sidebar-section-body">
+                        <div class="field">
+                            <div class="field-label"><span>What are you doing?</span></div>
+                            <div class="input-wrapper">
+                                <select id="runProfile" class="input" style="height: 40px;">
+                                    <option value="fastWipe" selected>Fast wipe (default)</option>
+                                    <option value="carefulWipe">Careful wipe</option>
+                                    <option value="mediaCurator">Review photos &amp; backup</option>
+                                    <option value="custom">Custom</option>
+                                </select>
+                            </div>
+                            <p id="runProfileHint" class="profile-hint">Unattended bulk delete. No popups each page.</p>
+                        </div>
+                        <div class="profile-only-custom field">
+                            <div class="field-label"><span>Delete pipeline</span></div>
+                            <div class="check-list">
+                                <label><input type="radio" name="pipeline" value="direct" checked><span>Direct — search and delete</span></label>
+                                <label><input type="radio" name="pipeline" value="mediaReview"><span>Interactive — review each batch</span></label>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+
                 <details class="sidebar-section" open>
                     <summary>Target</summary>
                     <div class="sidebar-section-body">
@@ -676,6 +825,31 @@
                                 <span class="info">/</span>
                             </div>
                             <p class="field-hint">Case-insensitive. Leave empty to ignore.</p>
+                        </div>
+                        <p class="field-group-title">Keep messages (inverse)</p>
+                        <p class="field-hint">Checked = do <b>not</b> delete these; remove everything else that matches your filters.</p>
+                        <div class="check-list">
+                            <label><input id="skipLink" type="checkbox"><span>Keep messages with links</span></label>
+                            <label><input id="skipFile" type="checkbox"><span>Keep messages with files</span></label>
+                            <label><input id="skipPinned" type="checkbox"><span>Keep pinned messages</span></label>
+                        </div>
+                    </div>
+                </details>
+
+                <details class="sidebar-section" id="mediaReviewSection" style="display: none;">
+                    <summary>Media review</summary>
+                    <div class="sidebar-section-body">
+                        <p class="field-hint">Only used with <b>Review photos &amp; backup</b> or Custom → Interactive pipeline.</p>
+                        <div class="check-list">
+                            <label><input type="radio" name="mediaScanMode" value="media_only" checked><span>Media only — attachments only</span></label>
+                            <label><input type="radio" name="mediaScanMode" value="all"><span>All messages — pick what to save</span></label>
+                        </div>
+                        <div class="field">
+                            <div class="field-label"><span>Batch size</span></div>
+                            <div class="input-wrapper">
+                                <input id="mediaBatchSize" class="input" type="number" value="50" min="5" max="100" step="1">
+                            </div>
+                            <p class="field-hint">How many messages to load before the review screen (5–100).</p>
                         </div>
                     </div>
                 </details>
@@ -772,6 +946,12 @@
                             <p class="field-hint">Pause between deletes (0.1–10 s). Raise if rate limited.</p>
                         </div>
                         <p class="field-group-title">Reliability</p>
+                        <div class="check-list">
+                            <label title="Only applies to Fast wipe and Custom with Direct pipeline">
+                                <input id="askConfirmation" type="checkbox">
+                                <span>Confirm before first delete batch</span>
+                            </label>
+                        </div>
                         <div class="field">
                             <div class="field-label">
                                 <span>Empty page retries</span>
@@ -811,6 +991,7 @@
                     <button id="toggleSidebar" class="sizeMedium icon">☰</button>
                     <button id="start" class="sizeMedium danger" style="width: 150px;" title="Start the deletion process">▶︎ Delete</button>
                     <button id="stop" class="sizeMedium" title="Stop the deletion process" disabled>🛑 Stop</button>
+                    <button id="copyLog" class="sizeMedium" title="Copy log text to clipboard">Copy log</button>
                     <button id="clear" class="sizeMedium">Clear log</button>
                     <label class="row" title="Masks Author/Server/Channel IDs and auth token as dots in the form. Hides message text, usernames, and IDs in the log (including lines already written). Toggle anytime — reversible.">
                         <input id="privacyMode" type="checkbox" checked> Privacy mode
@@ -821,7 +1002,7 @@
                 </div>
             </div>
             <div id="logArea" class="logarea scroll" role="log" aria-live="polite">
-                <div class="" style="background: var(--background-mentioned); padding: .5em;">Tip: If deletion stops early on empty pages, increase <b>Empty page retries</b> under Advanced settings.</div>
+                <div class="" style="background: var(--background-mentioned); padding: .5em;">Default <b>Fast wipe</b> runs unattended. Use <b>Review photos &amp; backup</b> only when you want to save attachments before deleting. Tip: if deletion stops early, increase <b>Empty page retries</b> under Advanced.</div>
                 <center>
                     <div>Star <a href="{{HOME}}" target="_blank" rel="noopener noreferrer">this project</a> on GitHub!</div>
                     <div><a href="{{HOME}}/issues" target="_blank" rel="noopener noreferrer">Issues or help</a></div>
@@ -842,6 +1023,16 @@
                 </label>
                 <div class="resize-handle"></div>
             </div>
+        </div>
+    </div>
+    <div id="undiscord-media-modal" aria-hidden="true">
+        <div class="media-modal-panel" role="dialog" aria-labelledby="mediaModalTitle">
+            <div class="media-modal-header">
+                <h4 id="mediaModalTitle">Backup selection</h4>
+                <p class="media-modal-hint">Click items to select (green border). Then choose an action. Double-click to open in Discord.</p>
+            </div>
+            <div id="mediaGallery" class="media-gallery"></div>
+            <div id="mediaModalFooter" class="media-modal-footer"></div>
         </div>
     </div>
 </div>
@@ -916,6 +1107,58 @@
 	  EMPTY_END: 'Done — no more search results.',
 	};
 
+	/** Presets — simple default; power features opt-in via profile or Custom */
+	const RUN_PROFILES = {
+	  fastWipe: {
+	    hint: 'Unattended bulk delete. No popups each page.',
+	    pipeline: 'direct',
+	    askForConfirmation: false,
+	    searchDelayMs: SEARCH_DELAY_MS.default,
+	    deleteDelayMs: DELETE_DELAY_MS.default,
+	    emptyPageRetries: 2,
+	    showMediaSection: false,
+	  },
+	  carefulWipe: {
+	    hint: 'Slower delays and confirm before the first delete batch.',
+	    pipeline: 'direct',
+	    askForConfirmation: true,
+	    searchDelayMs: 45000,
+	    deleteDelayMs: 1500,
+	    emptyPageRetries: 4,
+	    showMediaSection: false,
+	  },
+	  mediaCurator: {
+	    hint: 'Pauses every batch so you can backup attachments and choose what to delete.',
+	    pipeline: 'mediaReview',
+	    mediaScanMode: 'media_only',
+	    mediaBatchSize: 50,
+	    askForConfirmation: false,
+	    searchDelayMs: 30000,
+	    deleteDelayMs: 200,
+	    emptyPageRetries: 2,
+	    showMediaSection: true,
+	  },
+	  custom: {
+	    hint: 'You control pipeline and timing. Expand Media review if using interactive mode.',
+	    showMediaSection: true,
+	  },
+	};
+
+	const MEDIA_BATCH_ACTIONS = [
+	  { id: 'btnSelectAll', label: 'Select all', cls: 'media-btn-safe' },
+	  { id: 'btnKeepSelected', label: 'Keep selected', cls: 'media-btn-safe', action: 'KEEP_SELECTED' },
+	  { id: 'btnBackupKeepSelected', label: 'Backup & keep selected', cls: 'media-btn-safe', action: 'BACKUP_KEEP_SELECTED' },
+	  { id: 'btnBackupSelectKeep', label: 'Backup selected & keep all', cls: 'media-btn-safe', action: 'BACKUP_SELECT_KEEP' },
+	  { id: 'btnBackupAllKeepAll', label: 'Backup & keep all', cls: 'media-btn-safe', action: 'BACKUP_ALL_KEEP_ALL' },
+	  { id: 'btnSkipBatch', label: 'Skip batch', cls: 'media-btn-safe', action: 'SKIP' },
+	  { id: 'btnDeleteAll', label: 'Delete all', cls: 'media-btn-danger', action: 'DELETE_ALL' },
+	  { id: 'btnDeleteSelected', label: 'Delete selected', cls: 'media-btn-danger', action: 'DELETE_SELECTED' },
+	  { id: 'btnBackupDeleteSelected', label: 'Backup & delete selected', cls: 'media-btn-danger', action: 'BACKUP_DELETE_SELECTED' },
+	  { id: 'btnBackupSelectDelete', label: 'Backup selected & delete all', cls: 'media-btn-danger', action: 'BACKUP_SELECT_DELETE_ALL' },
+	  { id: 'btnBackupAllDeleteAll', label: 'Backup & delete all', cls: 'media-btn-danger', action: 'BACKUP_ALL_DELETE_ALL' },
+	  { id: 'btnMediaAbort', label: 'Abort', cls: 'media-btn-danger', action: 'STOP' },
+	];
+
 	/**
 	 * Delete all messages in a Discord channel or DM
 	 * @author Victornpb <https://www.github.com/victornpb>
@@ -946,6 +1189,14 @@
 	    retryOnNetworkError: true,
 	    maxNetworkRetries: 8,
 	    networkRetryBaseDelay: 1000,
+	    pipeline: 'direct', // 'direct' | 'mediaReview'
+	    mediaScanMode: 'media_only', // 'media_only' | 'all'
+	    mediaBatchSize: 50,
+	    skipLink: false,
+	    skipFile: false,
+	    skipPinned: false,
+	    serverName: 'Server',
+	    channelName: 'Channel',
 	  };
 
 	  state = {
@@ -988,6 +1239,7 @@
 	  _runFinished = false;
 	  _activeRequestController = null;
 	  _pendingWait = null;
+	  _mediaModalState = null;
 
 	  resetState() {
 	    this.state = {
@@ -1301,6 +1553,7 @@
 	  /** Start the deletion process */
 	  async run(isJob = false) {
 	    if (this.state.running && !isJob) return log.error('Already running!');
+	    if (this.options.pipeline === 'mediaReview') return this.runMediaReview(isJob);
 
 	    this._userStopped = false;
 	    this._runFinished = false;
@@ -1475,7 +1728,302 @@
 	    this.state.running = false;
 	    this.cancelPendingWait();
 	    this.cancelInFlightRequest();
+	    this.finishMediaModal('STOP');
 	    if (!this._runFinished) log.warn('Stop requested — finishing current request…');
+	  }
+
+	  finishMediaModal(action = 'STOP') {
+	    const modal = document.getElementById('undiscord-media-modal');
+	    if (modal) {
+	      modal.classList.remove('open');
+	      modal.setAttribute('aria-hidden', 'true');
+	    }
+	    if (this._mediaModalState) {
+	      const { resolve } = this._mediaModalState;
+	      this._mediaModalState = null;
+	      resolve(action);
+	    }
+	  }
+
+	  sanitizePathSegment(name) {
+	    return String(name || 'unknown').replace(/[<>:"/\\|?*]/g, '_').slice(0, 80);
+	  }
+
+	  async downloadAttachment(attachment, username) {
+	    const safeFilename = this.sanitizePathSegment(attachment.filename || 'file');
+	    const safeUser = this.sanitizePathSegment(username);
+	    const safeServer = this.sanitizePathSegment(this.options.serverName);
+	    const safeChannel = this.sanitizePathSegment(this.options.channelName);
+	    const relPath = `Undiscord_Media/${safeUser}/${safeServer}/${safeChannel}/${safeFilename}`;
+
+	    if (typeof GM_download !== 'undefined') {
+	      return new Promise((resolve, reject) => {
+	        GM_download({
+	          url: attachment.url,
+	          name: relPath,
+	          saveAs: false,
+	          onload: () => resolve(),
+	          onerror: (err) => reject(err),
+	          timeout: 30000,
+	        });
+	      });
+	    }
+
+	    try {
+	      const resp = await fetch(attachment.url);
+	      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+	      const blob = await resp.blob();
+	      const a = document.createElement('a');
+	      a.href = URL.createObjectURL(blob);
+	      a.download = safeFilename;
+	      a.click();
+	      URL.revokeObjectURL(a.href);
+	    } catch (err) {
+	      log.warn(`Could not download ${safeFilename}; opening in new tab.`, err);
+	      window.open(attachment.url, '_blank', 'noopener');
+	    }
+	  }
+
+	  askUserAction(messages) {
+	    return new Promise(resolve => {
+	      const modal = document.getElementById('undiscord-media-modal');
+	      const gallery = document.getElementById('mediaGallery');
+	      const footer = document.getElementById('mediaModalFooter');
+	      if (!modal || !gallery || !footer) {
+	        return resolve({ action: 'STOP', downloadIds: new Set() });
+	      }
+
+	      const downloadSet = new Set();
+	      const finish = (action) => {
+	        this._mediaModalState = null;
+	        modal.classList.remove('open');
+	        modal.setAttribute('aria-hidden', 'true');
+	        resolve({ action, downloadIds: downloadSet });
+	      };
+	      this._mediaModalState = { resolve: finish, downloadSet };
+
+	      footer.innerHTML = '';
+	      const btnMap = {};
+
+	      for (const spec of MEDIA_BATCH_ACTIONS) {
+	        const btn = document.createElement('button');
+	        btn.type = 'button';
+	        btn.id = spec.id;
+	        btn.className = spec.cls;
+	        btn.textContent = spec.label;
+	        footer.appendChild(btn);
+	        btnMap[spec.id] = btn;
+	      }
+
+	      btnMap.btnSelectAll.onclick = () => {
+	        const allSelected = downloadSet.size === messages.length;
+	        gallery.querySelectorAll('.media-card').forEach((card, index) => {
+	          const id = messages[index]?.id;
+	          if (!id) return;
+	          if (allSelected) {
+	            downloadSet.delete(id);
+	            card.classList.remove('selected');
+	          } else {
+	            downloadSet.add(id);
+	            card.classList.add('selected');
+	          }
+	        });
+	      };
+
+	      for (const spec of MEDIA_BATCH_ACTIONS) {
+	        if (!spec.action) continue;
+	        btnMap[spec.id].onclick = () => finish(spec.action);
+	      }
+
+	      gallery.innerHTML = '';
+	      const guildId = this.options.guildId || '@me';
+	      const channelId = this.options.channelId || '';
+
+	      for (const msg of messages) {
+	        let src = msg.attachments?.length ? msg.attachments[0].url : (msg.embeds?.[0]?.thumbnail?.url || null);
+	        let ext = 'TEXT';
+	        let isVideo = false;
+	        const filename = msg.attachments?.[0]?.filename || '';
+
+	        if (msg.attachments?.length) {
+	          const dot = filename.lastIndexOf('.');
+	          if (dot !== -1) ext = filename.substring(dot + 1).toUpperCase();
+	          if (['MP4', 'MOV', 'WEBM', 'AVI', 'MKV'].includes(ext)) isVideo = true;
+	        } else if (src) {
+	          if (/\.(mp4|webm|mov)(\?|$)/i.test(src)) { ext = 'VIDEO'; isVideo = true; }
+	          else ext = 'IMAGE';
+	        }
+
+	        if (!src) {
+	          src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect fill="#1e1f22" width="120" height="120"/><text x="50%" y="50%" fill="#949ba4" font-size="12" text-anchor="middle" dy=".3em">No preview</text></svg>');
+	        }
+
+	        const jumpLink = `https://discord.com/channels/${guildId}/${msg.channel_id || channelId}/${msg.id}`;
+	        const card = document.createElement('div');
+	        card.className = 'media-card';
+	        const mediaHtml = isVideo
+	          ? `<video src="${escapeHTML(src)}" loop muted preload="metadata"></video>`
+	          : `<img src="${escapeHTML(src)}" alt="" loading="lazy">`;
+	        card.innerHTML = `<span class="media-badge">${escapeHTML(ext)}</span>${mediaHtml}`;
+	        card.onclick = () => {
+	          if (downloadSet.has(msg.id)) {
+	            downloadSet.delete(msg.id);
+	            card.classList.remove('selected');
+	          } else {
+	            downloadSet.add(msg.id);
+	            card.classList.add('selected');
+	          }
+	        };
+	        card.ondblclick = () => window.open(jumpLink, '_blank', 'noopener');
+	        card.title = 'Click to select · double-click to open in Discord';
+	        gallery.appendChild(card);
+	      }
+
+	      modal.classList.add('open');
+	      modal.setAttribute('aria-hidden', 'false');
+	    });
+	  }
+
+	  async applyMediaBatchAction(buffer, result) {
+	    const ids = result.downloadIds || new Set();
+	    const doDownload = async (list) => {
+	      for (const msg of list) {
+	        if (!this.state.running) return;
+	        const attachments = msg.attachments || [];
+	        if (!attachments.length) continue;
+	        for (const att of attachments) {
+	          try {
+	            await this.downloadAttachment(att, msg.author?.username || 'unknown');
+	            log.success(`Saved: ${att.filename}`);
+	          } catch (e) {
+	            log.error(`Download failed: ${att.filename}`);
+	          }
+	        }
+	      }
+	    };
+
+	    switch (result.action) {
+	      case 'SKIP':
+	        log.info('Skipped batch — all messages kept.');
+	        return [];
+	      case 'KEEP_SELECTED':
+	        log.info('Keeping selected — deleting the rest.');
+	        return buffer.filter(m => !ids.has(m.id));
+	      case 'BACKUP_KEEP_SELECTED': {
+	        await doDownload(buffer.filter(m => ids.has(m.id)));
+	        return buffer.filter(m => !ids.has(m.id));
+	      }
+	      case 'BACKUP_SELECT_KEEP': {
+	        await doDownload(buffer.filter(m => ids.has(m.id)));
+	        return [];
+	      }
+	      case 'BACKUP_ALL_KEEP_ALL':
+	        await doDownload(buffer);
+	        return [];
+	      case 'DELETE_ALL':
+	        return buffer;
+	      case 'DELETE_SELECTED':
+	        return buffer.filter(m => ids.has(m.id));
+	      case 'BACKUP_DELETE_SELECTED': {
+	        const sel = buffer.filter(m => ids.has(m.id));
+	        await doDownload(sel);
+	        return sel;
+	      }
+	      case 'BACKUP_SELECT_DELETE_ALL': {
+	        await doDownload(buffer.filter(m => ids.has(m.id)));
+	        return buffer;
+	      }
+	      case 'BACKUP_ALL_DELETE_ALL':
+	        await doDownload(buffer);
+	        return buffer;
+	      case 'STOP':
+	      default:
+	        return [];
+	    }
+	  }
+
+	  async runMediaReview(isJob = false) {
+	    if (this.state.running && !isJob) return log.error('Already running!');
+
+	    this._userStopped = false;
+	    this._runFinished = false;
+	    this.state.running = true;
+	    this.stats.startTime = new Date();
+
+	    log.success(`Started at ${this.stats.startTime.toLocaleString()}`);
+	    log.info('Interactive media review — choose what to backup or delete for each batch.');
+
+	    if (this.onStart) this.onStart(this.state, this.stats);
+
+	    let messageBuffer = [];
+	    const batchSize = Math.max(5, Math.min(100, Number(this.options.mediaBatchSize) || 50));
+	    const bufferScanDelay = 4000;
+
+	    try {
+	      do {
+	        this.state.iterations++;
+	        log.debug('Fetching messages...');
+	        await this.search();
+	        if (!this.state.running) break;
+
+	        await this.filterResponse();
+	        if (!this.state.running) break;
+
+	        this.calcEtr();
+	        if (this.onProgress) this.onProgress(this.state, this.stats);
+
+	        const found = this.state._messagesToDelete;
+	        if (found.length > 0) {
+	          messageBuffer.push(...found);
+	          log.info(`Buffered ${found.length} message(s) — ${messageBuffer.length}/${batchSize} in this batch.`);
+	        }
+
+	        const pageMsgs = Number(this.state._seachResponse?.messages?.length || 0);
+	        const apiHasMore = pageMsgs > 0;
+
+	        if (messageBuffer.length < batchSize && apiHasMore) {
+	          log.verb(`Buffering… next scan in ${(bufferScanDelay / 1000).toFixed(0)}s.`);
+	          if (!await this.interruptibleWait(bufferScanDelay)) break;
+	          continue;
+	        }
+
+	        if (messageBuffer.length > 0) {
+	          log.info(`Batch ready (${messageBuffer.length} items). Waiting for your choice…`);
+	          const result = await this.askUserAction(messageBuffer);
+	          if (result.action === 'STOP' || !this.state.running) {
+	            this._userStopped = true;
+	            this.state.running = false;
+	            break;
+	          }
+
+	          const toDelete = await this.applyMediaBatchAction(messageBuffer, result);
+	          messageBuffer = [];
+
+	          if (toDelete.length > 0) {
+	            this.state._messagesToDelete = toDelete;
+	            const prevDelay = this.options.deleteDelay;
+	            if (this.options.pipeline === 'mediaReview') this.options.deleteDelay = Math.max(100, Math.min(prevDelay, 500));
+	            await this.deleteMessagesFromList();
+	            this.options.deleteDelay = prevDelay;
+
+	            const doneNow = await this.quickCheckIfDone();
+	            if (doneNow) {
+	              this.logSummary(this.completionMessage());
+	              break;
+	            }
+	          }
+	        } else if (!apiHasMore) {
+	          this.logSummary(this.state.grandTotal === 0 ? END_MSG.NO_MATCHES : END_MSG.EMPTY_END);
+	          this.state.running = false;
+	          break;
+	        }
+
+	        if (this.state.running) await this.interruptibleWait(this.options.searchDelay);
+	      } while (this.state.running);
+	    } finally {
+	      this.finishMediaModal('STOP');
+	      this.completeRun();
+	    }
 	  }
 
 	  /** Calculate the estimated time remaining based on the current stats */
@@ -1485,6 +2033,7 @@
 
 	  /** As for confirmation in the beggining process */
 	  async confirm() {
+	    if (this.options.pipeline === 'mediaReview') return true;
 	    if (!this.options.askForConfirmation) return true;
 
 	    log.verb('Waiting for your confirmation...');
@@ -1528,6 +2077,10 @@
 	          ? `https://discord.com/api/v9/guilds/${this.options.guildId}/messages/`
 	          : `https://discord.com/api/v9/channels/${this.options.channelId}/messages/`;
 	        const queryChannelId = (useGuildScope && allowGuildChannelFilter) ? this.options.channelId : undefined;
+	        const strictMediaOnly = this.options.pipeline === 'mediaReview' && this.options.mediaScanMode === 'media_only';
+	        const searchHasFile = strictMediaOnly ? true : this.options.hasFile;
+	        const searchHasLink = this.options.hasLink;
+	        const searchContent = strictMediaOnly ? undefined : (this.options.content || undefined);
 	        const reqCtl = this.beginAbortableRequest();
 	        this.beforeRequest();
 	        resp = await fetch(API_SEARCH_URL + 'search?' + queryString([
@@ -1538,9 +2091,9 @@
 	          ['sort_by', 'timestamp'],
 	          ['sort_order', 'desc'],
 	          ['offset', this.state.offset],
-	          ['has', this.options.hasLink ? 'link' : undefined],
-	          ['has', this.options.hasFile ? 'file' : undefined],
-	          ['content', this.options.content || undefined],
+	          ['has', searchHasLink ? 'link' : undefined],
+	          ['has', searchHasFile ? 'file' : undefined],
+	          ['content', searchContent],
 	          ['include_nsfw', this.options.includeNsfw ? true : undefined],
 	        ]), {
 	          headers: { Authorization: this.options.authToken },
@@ -1687,6 +2240,19 @@
 	    // type 46 = polls (self-deletable) — PR #741
 	    let messagesToDelete = discoveredMessages.filter(msg => msg.type === 0 || msg.type === 46 || (msg.type >= 6 && msg.type <= 19));
 	    messagesToDelete = messagesToDelete.filter(msg => msg.pinned ? this.options.includePinned : true);
+
+	    if (this.options.skipLink || this.options.skipFile || this.options.skipPinned) {
+	      messagesToDelete = messagesToDelete.filter(msg => {
+	        if (this.options.skipPinned && msg.pinned) return false;
+	        if (this.options.skipLink && /https?:\/\//i.test(String(msg.content || ''))) return false;
+	        if (this.options.skipFile && Array.isArray(msg.attachments) && msg.attachments.length > 0) return false;
+	        return true;
+	      });
+	    }
+
+	    if (this.options.pipeline === 'mediaReview' && this.options.mediaScanMode === 'media_only') {
+	      messagesToDelete = messagesToDelete.filter(msg => Array.isArray(msg.attachments) && msg.attachments.length > 0);
+	    }
 
 	    // custom filter of messages
 	    try {
@@ -2200,6 +2766,73 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 
 	const PREFIX = '[UNDISCORD]';
 
+	function applyRunProfileToUI(profileId) {
+	  if (!ui.undiscordWindow) return;
+	  const profile = RUN_PROFILES[profileId] || RUN_PROFILES.custom;
+	  const select = ui.undiscordWindow.querySelector('#runProfile');
+	  if (select && select.value !== profileId) select.value = profileId;
+	  ui.undiscordWindow.dataset.profile = profileId;
+
+	  const hint = ui.undiscordWindow.querySelector('#runProfileHint');
+	  if (hint) hint.textContent = profile.hint || RUN_PROFILES.custom.hint;
+
+	  const mediaSection = ui.undiscordWindow.querySelector('#mediaReviewSection');
+	  const showMedia = profile.showMediaSection || profileId === 'custom';
+	  if (mediaSection) mediaSection.style.display = showMedia ? '' : 'none';
+
+	  if (profileId === 'custom') return;
+
+	  if (profile.pipeline) {
+	    const radio = ui.undiscordWindow.querySelector(`input[name="pipeline"][value="${profile.pipeline}"]`);
+	    if (radio) radio.checked = true;
+	  }
+	  if (profile.searchDelayMs != null) syncDelayInput('searchDelay', profile.searchDelayMs, SEARCH_DELAY_MS);
+	  if (profile.deleteDelayMs != null) syncDelayInput('deleteDelay', profile.deleteDelayMs, DELETE_DELAY_MS);
+	  if (profile.emptyPageRetries != null) {
+	    const el = ui.undiscordWindow.querySelector('#emptyPageRetries');
+	    if (el) el.value = profile.emptyPageRetries;
+	  }
+	  if (profile.mediaScanMode) {
+	    const r = ui.undiscordWindow.querySelector(`input[name="mediaScanMode"][value="${profile.mediaScanMode}"]`);
+	    if (r) r.checked = true;
+	  }
+	  if (profile.mediaBatchSize != null) {
+	    const b = ui.undiscordWindow.querySelector('#mediaBatchSize');
+	    if (b) b.value = profile.mediaBatchSize;
+	  }
+	  const askEl = ui.undiscordWindow.querySelector('#askConfirmation');
+	  if (askEl && profile.askForConfirmation !== undefined) askEl.checked = profile.askForConfirmation;
+	}
+
+	function readPipelineFromUI() {
+	  const profileId = ui.undiscordWindow?.querySelector('#runProfile')?.value || 'fastWipe';
+	  if (profileId !== 'custom' && RUN_PROFILES[profileId]?.pipeline) {
+	    return RUN_PROFILES[profileId].pipeline;
+	  }
+	  return ui.undiscordWindow?.querySelector('input[name="pipeline"]:checked')?.value || 'direct';
+	}
+
+	function getDiscordContextNames() {
+	  const guildId = ui.undiscordWindow?.querySelector('#guildId')?.value?.trim();
+	  const channelId = ui.undiscordWindow?.querySelector('#channelId')?.value?.trim().split(/\s*,\s*/)[0];
+	  return {
+	    serverName: guildId === '@me' ? 'Direct_Messages' : (guildId || 'Server'),
+	    channelName: channelId || 'Channel',
+	  };
+	}
+
+	function copyLogAction() {
+	  const text = ui.logArea?.innerText || '';
+	  if (!text.trim()) return log.warn('Log is empty.');
+	  const done = () => log.success('Log copied to clipboard.');
+	  const fail = () => log.error('Could not copy log — select and copy manually.');
+	  if (navigator.clipboard?.writeText) {
+	    navigator.clipboard.writeText(text).then(done).catch(fail);
+	  } else {
+	    fail();
+	  }
+	}
+
 	// -------------------------- User interface ------------------------------- //
 
 	// links — fork repo for project/issues; original wiki for field help docs
@@ -2452,7 +3085,10 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	  };
 	  $('button#start').onclick = startAction;
 	  $('button#stop').onclick = stopAction;
+	  $('button#copyLog').onclick = copyLogAction;
 	  $('button#clear').onclick = () => ui.logArea.innerHTML = '';
+	  $('select#runProfile').onchange = (e) => applyRunProfileToUI(e.target.value);
+	  applyRunProfileToUI('fastWipe');
 	  $('button#getAuthor').onclick = () => $('input#authorId').value = getAuthorId();
 	  $('button#getGuild').onclick = () => {
 	    const guildId = $('input#guildId').value = getGuildId();
@@ -2622,7 +3258,23 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	  const searchDelay = readDelayInput('searchDelay', SEARCH_DELAY_MS);
 	  const deleteDelay = readDelayInput('deleteDelay', DELETE_DELAY_MS);
 	  const emptyPageRetries = parseInt($('input#emptyPageRetries').value.trim(), 10);
+	  const skipLink = $('input#skipLink').checked;
+	  const skipFile = $('input#skipFile').checked;
+	  const skipPinned = $('input#skipPinned').checked;
+	  const pipeline = readPipelineFromUI();
+	  const mediaScanMode = $('input[name="mediaScanMode"]:checked')?.value || 'media_only';
+	  const mediaBatchSize = parseInt($('input#mediaBatchSize').value.trim(), 10);
+	  const profileId = $('select#runProfile').value;
+	  const profile = RUN_PROFILES[profileId] || RUN_PROFILES.custom;
+	  const askForConfirmation = profileId === 'custom'
+	    ? $('input#askConfirmation').checked
+	    : (profile.askForConfirmation ?? false);
+	  const { serverName, channelName } = getDiscordContextNames();
 	  syncLogOptionsFromUI();
+
+	  if (pipeline === 'mediaReview' && channelIds.length > 1) {
+	    return log.error('Interactive media review supports one channel at a time. Use a single Channel ID or run Fast wipe for batch jobs.');
+	  }
 
 	  // token
 	  const authToken = $('input#token').value.trim() || fillToken();
@@ -2654,8 +3306,22 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	    emptyPageRetries: Number.isNaN(emptyPageRetries) ? 2 : emptyPageRetries,
 	    verboseLog: undiscordCore.options.verboseLog,
 	    logEveryDeletion: undiscordCore.options.logEveryDeletion,
-	    // maxAttempt: 2,
+	    pipeline,
+	    mediaScanMode,
+	    mediaBatchSize: Number.isNaN(mediaBatchSize) ? 50 : Math.max(5, Math.min(100, mediaBatchSize)),
+	    skipLink,
+	    skipFile,
+	    skipPinned,
+	    askForConfirmation,
+	    serverName,
+	    channelName,
 	  };
+
+	  if (pipeline === 'mediaReview') {
+	    log.info(`Profile: ${profileId} — interactive review (${mediaScanMode === 'media_only' ? 'attachments only' : 'all messages'}).`);
+	  } else if (profileId !== 'fastWipe') {
+	    log.info(`Profile: ${profileId} — direct delete.`);
+	  }
 	  if (channelIds.length > 1) {
 	    const jobs = channelIds.map(ch => ({
 	      guildId: guildId,

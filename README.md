@@ -33,11 +33,13 @@ What you delete, and what filters you use, is **your business**. This project is
 
 ## Features
 
+- **Run profiles** — **Fast wipe** (default, unattended), **Careful wipe** (slower + confirm), **Review photos & backup** (interactive gallery), or **Custom** for full control.
 - **Bulk message deletion** — search and delete your messages in a server channel or DM, with progress and time estimates.
-- **Rich filtering** — text search, `has: link` / `has: file`, regex patterns, pinned messages, message ID ranges, and date ranges.
-- **Batch jobs** — comma-separated channel IDs, or import `messages/index.json` from a [Discord data export](https://support.discord.com/hc/en-us/articles/360004957031) to wipe many channels at once.
-- **Rate-limit aware** — adjusts search and delete delays when Discord throttles requests; configurable empty-page retries for long runs.
-- **Modern UI** — Discord-dark theme, draggable/resizable window, sidebar sections, in-panel logging, and privacy mode to mask sensitive fields and log lines.
+- **Rich filtering** — text search, `has: link` / `has: file`, regex patterns, pinned messages, message ID ranges, date ranges, and **inverse keep** rules (e.g. keep messages with files, delete the rest).
+- **Media review mode** — pause every batch to preview attachments, download backups (`Undiscord_Media/…` via Tampermonkey), and choose what to delete or keep.
+- **Batch jobs** — comma-separated channel IDs, or import `messages/index.json` from a [Discord data export](https://support.discord.com/hc/en-us/articles/360004957031) to wipe many channels at once (use **Fast wipe** for multi-channel).
+- **Rate-limit aware** — adjusts search and delete delays when Discord throttles requests; configurable empty-page retries for long runs; network retry on 503/transient failures.
+- **Modern UI** — Discord-dark theme, draggable/resizable window, sidebar sections, copy log, in-panel logging, and privacy mode to mask sensitive fields and log lines.
 - **Up-to-date Discord integration** — toolbar button with resilient mount and re-attach when the client re-renders.
 
 ## Requirements

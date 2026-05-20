@@ -1,7 +1,20 @@
 # Undiscord 2: Electric Boogaloo
 
-> [!WARNING]
-> **This script violates Discord’s [Terms of Service](https://discord.com/terms).** Using it automates actions against Discord’s API in ways Discord does not permit. **Your account may be banned** — temporarily or permanently. Use this script only if you accept that risk, and proceed with **extreme caution**.
+> [!CAUTION]
+> **Using this script can get your Discord account terminated.** It automates **your normal user account** (a “self-bot”) via Discord’s HTTP API. That is **not** the supported bot/OAuth2 developer flow Discord allows.
+>
+> Discord’s policies that apply here include:
+>
+> - **[Terms of Service](https://discord.com/terms)** — under **“Restrictions on your use of Discord’s services”**, you must not, among other things:
+>   - use the services to **“auto-messaging”** people through automated means;
+>   - **scrape** the services without written consent using **“any … automatic device, process, or software”**;
+>   - use **“unauthorized software designed to modify the services”**.
+> - **[Automated User Accounts (Self-Bots)](https://support.discord.com/hc/en-us/articles/115002192352-Automated-User-Accounts-Self-Bots)** — Discord states that **automating normal user accounts outside of the OAuth2/bot API is forbidden** and **can result in account termination if found**.
+> - **[Developer Terms of Service](https://discord.com/developers/docs/legal)** — if you use Discord’s APIs outside the approved developer/bot model, you are not operating under the permissions Discord grants to registered applications.
+>
+> Under the same Terms, Discord may **suspend or terminate your account** (with or without notice, at Discord’s discretion) if you breach these terms — including via automation like bulk deletion.
+>
+> **You are solely responsible** for using this tool. Only proceed if you understand and accept that risk.
 
 An overhauled, maintained fork of [Undiscord](https://github.com/victornpb/undiscord) — a userscript that bulk-deletes your own messages on Discord via the web client.
 
@@ -78,7 +91,9 @@ This repository is not affiliated with Discord Inc. or the original Undiscord ma
 
 ## Disclaimer
 
-Using automation against Discord’s API may violate the [Discord Terms of Service](https://discord.com/terms). You are responsible for how you use this script. It only deletes messages **you** have permission to delete (typically your own). There is no warranty — see the license below.
+This userscript is **not** affiliated with, endorsed by, or approved by Discord Inc. It uses your user authorization token to call `discord.com/api` the same way the web client does, which Discord classifies as forbidden **self-bot** automation when used for scripted bulk actions (see the [self-bot policy](https://support.discord.com/hc/en-us/articles/115002192352-Automated-User-Accounts-Self-Bots) and [Terms of Service — Restrictions](https://discord.com/terms)).
+
+You are responsible for compliance with Discord’s Terms, [Community Guidelines](https://discord.com/guidelines), and applicable law. The script only attempts to delete messages **your account** is permitted to delete (typically your own). There is no warranty — see the license below.
 
 For how data is handled in the browser, see **[PRIVACY.md](./PRIVACY.md)**.
 

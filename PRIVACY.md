@@ -50,7 +50,7 @@ The script header requests:
 
 ### Discord authorization token
 
-> [!WARNING]
+> [!CAUTION]
 > **Your token is full account access.** Anyone who obtains it can act as you on Discord’s API. Never paste it into untrusted sites, share screenshots with Privacy mode off, or install a repackaged script you have not audited.
 
 - Needed to search and delete on your behalf.

@@ -1,6 +1,6 @@
 # Undiscord 2: Electric Boogaloo
 
-**Version:** 1.3.0 · **Script:** [`undiscord-electric-boogaloo.user.js`](./undiscord-electric-boogaloo.user.js)
+**Version:** 1.3.1 · **Script:** [`undiscord-electric-boogaloo.user.js`](./undiscord-electric-boogaloo.user.js)
 
 > [!CAUTION]
 > **Using this script can get your Discord account terminated.** It automates **your normal user account** (a “self-bot”) via Discord’s HTTP API. That is **not** the supported bot/OAuth2 developer flow Discord allows.
@@ -57,7 +57,7 @@ Copy [`undiscord-electric-boogaloo.user.js`](./undiscord-electric-boogaloo.user.
 
 1. Open the channel (or server) you want to clean up.
 2. Open the Undiscord panel → set **Run profile** to **Fast wipe** (default).
-3. Under **Target**, click **Me**, **Current** (server), **Current** (channel) — or enable **All message channels in this server** for a full server wipe.
+3. Under **Target**, confirm **Author ID** is filled (auto-fills on load; click **Me** if empty), then **Current** for server/channel — or enable **All message channels in this server** for a full server wipe.
 4. Click **▶︎ Delete**. For **Fast wipe**, no confirmation popup after the first batch unless you enable it in Advanced.
 5. Use **🛑 Stop** to cancel. Closing the panel with the trash icon **does not** stop a run in progress.
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Undiscord 2: Electric Boogaloo
 // @description     Bulk-delete your Discord messages: fast wipe, server-wide cleanup, media backup gallery, checkpoints, and reliability fixes.
-// @version         1.3.0
+// @version         1.3.1
 // @author          Levskitron
 // @homepageURL     https://github.com/Levskitron/undiscord2electricboogaloo
 // @supportURL      https://github.com/Levskitron/undiscord2electricboogaloo/issues
@@ -16,7 +16,7 @@
 	'use strict';
 
 	/* rollup-plugin-baked-env */
-	const VERSION = '1.3.0';
+	const VERSION = '1.3.1';
 	const CHECKPOINT_KEY = 'undiscord_eb_checkpoint_v1';
 	const LOG_MAINTENANCE_INTERVAL_MS = 3600000;
 	const TOOL_NAME = 'Undiscord 2: Electric Boogaloo';
@@ -788,6 +788,7 @@
                                 </div>
                                 <button type="button" class="field-btn" id="getChannel">Current</button>
                             </div>
+                            <p class="field-hint">Your user ID is required — only <b>your</b> messages are deleted. Auto-fills when Discord loads; use <b>Me</b> if empty.</p>
                             <p class="field-hint">Use commas for multiple channels, or enable server-wide wipe below.</p>
                             <div id="checkpointBanner" class="checkpoint-banner" style="display: none;">
                                 <p class="field-hint field-hint-warn" id="checkpointBannerText">Paused run — channels remaining.</p>
@@ -1245,6 +1246,7 @@
 	  if (!ui.undiscordWindow) return {};
 	  const $ = s => ui.undiscordWindow.querySelector(s);
 	  return {
+	    authorId: $('input#authorId')?.value?.trim() || '',
 	    content: $('input#search')?.value?.trim() || '',
 	    hasLink: !!$('input#hasLink')?.checked,
 	    hasFile: !!$('input#hasFile')?.checked,
@@ -1511,6 +1513,8 @@
 
 	    this._skipHintShown = false;
 	    this._pinnedHintShown = false;
+	    this._delete403HintShown = false;
+	    this._authorFilterHintShown = false;
 	    this._activeRequestController = null;
 	    this._pendingWait = null;
 	    this.options.askForConfirmation = true;
@@ -2622,6 +2626,22 @@
 	    // type 46 = polls (self-deletable) — PR #741
 	    let messagesToDelete = discoveredMessages.filter(msg => msg.type === 0 || msg.type === 46 || (msg.type >= 6 && msg.type <= 19));
 	    messagesToDelete = messagesToDelete.filter(msg => msg.type !== 20);
+
+	    if (!this.options.authorId) {
+	      if (!this._authorFilterHintShown) {
+	        this._authorFilterHintShown = true;
+	        log.error('Author ID is missing — refusing to delete. Click **Me** next to Author ID (or reload Discord so it auto-fills).');
+	      }
+	      messagesToDelete = [];
+	    } else {
+	      const beforeAuthor = messagesToDelete.length;
+	      messagesToDelete = messagesToDelete.filter(msg => String(msg?.author?.id || '') === String(this.options.authorId));
+	      if (beforeAuthor > messagesToDelete.length && !this._authorFilterHintShown) {
+	        this._authorFilterHintShown = true;
+	        log.warn(`Dropped ${beforeAuthor - messagesToDelete.length} message(s) from other users — search was not scoped to your Author ID.`);
+	      }
+	    }
+
 	    if (!this.options.includeBotMessages) {
 	      messagesToDelete = messagesToDelete.filter(msg => !msg.author?.bot);
 	    }
@@ -2749,6 +2769,21 @@
 	        }
 
 	        const body = await resp.text();
+
+	        if (resp.status === 403) {
+	          if (!this._delete403HintShown) {
+	            this._delete403HintShown = true;
+	            const notMine = this.options.authorId && String(message?.author?.id || '') !== String(this.options.authorId);
+	            if (notMine) {
+	              log.warn('403 Forbidden — message is not yours. Fill **Author ID** (Me) so search only finds your messages.');
+	            } else {
+	              log.warn('403 Forbidden — Discord denied this delete. Skipping.');
+	            }
+	          }
+	          this.state.offset++;
+	          return 'FAIL_SKIP';
+	        }
+
 	        if (resp.status >= 500 && resp.status <= 599 && this.options.retryOnNetworkError) {
 	          networkAttempt++;
 	          if (networkAttempt <= (this.options.maxNetworkRetries ?? 8)) {
@@ -3241,8 +3276,36 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t||''},'*');
 	}
 
 	function getAuthorId() {
-	  const LS = document.body.appendChild(document.createElement('iframe')).contentWindow.localStorage;
-	  return JSON.parse(LS.user_id_cache);
+	  const iframe = document.body.appendChild(document.createElement('iframe'));
+	  try {
+	    const raw = iframe.contentWindow.localStorage.getItem('user_id_cache');
+	    if (!raw) return '';
+	    try {
+	      const parsed = JSON.parse(raw);
+	      return String(parsed ?? '').trim();
+	    } catch {
+	      return String(raw).trim().replace(/^"|"$/g, '');
+	    }
+	  } finally {
+	    try { iframe.remove(); } catch {}
+	  }
+	}
+
+	/** Fill Author ID from Discord localStorage when the field is empty */
+	function tryAutofillAuthorId() {
+	  if (!ui.undiscordWindow) return '';
+	  const input = ui.undiscordWindow.querySelector('#authorId');
+	  if (!input || input.value.trim()) return input?.value.trim() || '';
+	  try {
+	    const id = getAuthorId();
+	    if (id) {
+	      input.value = id;
+	      return id;
+	    }
+	  } catch (err) {
+	    log.verb('Author ID autofill failed:', err?.message || err);
+	  }
+	  return '';
 	}
 
 	function getGuildId() {
@@ -3795,8 +3858,9 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t||''},'*');
 
 	  let lastRoutePath = location.pathname;
 	  function tryAutofillFromRoute() {
-	    if (!$('input#autofillOnNavigate').checked) return;
 	    if (undiscordCore.state.running) return;
+	    tryAutofillAuthorId();
+	    if (!$('input#autofillOnNavigate').checked) return;
 	    const m = location.pathname.match(/\/channels\/([\w@]+)\/(\d+)/);
 	    if (!m) return;
 	    $('input#guildId').value = m[1];
@@ -3809,14 +3873,22 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t||''},'*');
 	      tryAutofillFromRoute();
 	    }
 	  }, 1200);
-	  $('button#getAuthor').onclick = () => $('input#authorId').value = getAuthorId();
+	  $('button#getAuthor').onclick = () => {
+	    try {
+	      $('input#authorId').value = getAuthorId();
+	    } catch (err) {
+	      log.error('Could not read your Author ID from Discord.', err);
+	    }
+	  };
 	  $('button#getGuild').onclick = () => {
 	    const guildId = $('input#guildId').value = getGuildId();
 	    if (guildId === '@me') $('input#channelId').value = getChannelId();
+	    tryAutofillAuthorId();
 	  };
 	  $('button#getChannel').onclick = () => {
 	    $('input#channelId').value = getChannelId();
 	    $('input#guildId').value = getGuildId();
+	    tryAutofillAuthorId();
 	  };
 	  function applyPrivacyMode() {
 	    ui.undiscordWindow.classList.toggle('privacy-mode', $('input#privacyMode').checked);
@@ -3964,7 +4036,11 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t||''},'*');
 	  resumeFromCheckpoint = false;
 
 	  // general
-	  const authorId = $('input#authorId').value.trim();
+	  let authorId = $('input#authorId').value.trim();
+	  if (!authorId) authorId = tryAutofillAuthorId();
+	  if (!authorId) {
+	    return log.error('Author ID is required. Click **Me** next to Author ID, or reload Discord while logged in so it can auto-fill.');
+	  }
 	  const guildId = $('input#guildId').value.trim();
 	  const deleteAllChannels = resuming ? true : $('input#deleteAllChannels').checked;
 	  let channelIds = deleteAllChannels && !resuming

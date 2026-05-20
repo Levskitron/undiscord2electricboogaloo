@@ -50,6 +50,9 @@ What you delete, and what filters you use, is **your business**. This project is
 
 ## Installation
 
+> [!WARNING]
+> **Install only from a source you trust.** Prefer the official raw file linked below (or a release you have diffed against this repository). Third-party repacks, “fixed” mirrors, or auto-updated copies from unknown authors can alter the script to steal your Discord token or change what it deletes.
+
 1. Install a userscript manager in your browser.
 2. Open the raw userscript file:
    - [`undiscord-electric-boogaloo.user.js`](https://github.com/Levskitron/undiscord2electricboogaloo/raw/main/undiscord-electric-boogaloo.user.js)
@@ -73,10 +76,13 @@ For field-by-field help, the in-app links point to the [original Undiscord wiki]
 
 ### Tips
 
-- Start with conservative **search** and **delete** delays if you hit rate limits; the script will increase delays automatically when throttled.
-- For very large jobs, raise **Empty page retries** (Advanced) if the run stops early while matches remain.
-- Use **Privacy mode** before sharing your screen — it masks tokens, IDs, and deletion log content (toggle anytime).
-- Deleting large histories can take a long time; keep the Discord tab open until the run finishes.
+> [!TIP]
+> Practical advice for long or trouble-free runs:
+>
+> - Start with conservative **search** and **delete** delays if you hit rate limits; the script will increase delays automatically when throttled.
+> - For very large jobs, raise **Empty page retries** (Advanced) if the run stops early while matches remain.
+> - Use **Privacy mode** before sharing your screen — it masks tokens, IDs, and deletion log content (toggle anytime).
+> - Deleting large histories can take a long time; keep the Discord tab open until the run finishes.
 
 ## Why this fork?
 

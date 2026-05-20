@@ -2,7 +2,13 @@
 
 **Undiscord 2: Electric Boogaloo** is a client-side userscript. It runs entirely in your browser on `discord.com`. There is no backend, no account system, and no analytics service operated by this project.
 
-This document explains what the script does with your data so you can decide whether you are comfortable using it. **We strongly encourage you to read and audit [`undiscord-electric-boogaloo.user.js`](./undiscord-electric-boogaloo.user.js) yourself** (or have someone you trust review it) before installing or running it. Open source is not automatic trust — verification is your responsibility.
+This document explains what the script does with your data so you can decide whether you are comfortable using it.
+
+> [!IMPORTANT]
+> **Read the source before you run this.** Open source is not automatic trust. Audit [`undiscord-electric-boogaloo.user.js`](./undiscord-electric-boogaloo.user.js) yourself (or have someone you trust review it) so you know exactly what it does on your machine.
+
+> [!CAUTION]
+> **Account risk is separate from privacy.** Even when this project never sees your data, using the script can still get your Discord account **suspended or terminated** for self-bot / automation policy violations. See the **[README caution](./README.md)** for Discord’s official policy links and quotes.
 
 ## Summary
 
@@ -26,6 +32,9 @@ Nothing in this flow uploads your chat history, token, or files to this GitHub p
 ## What the script accesses (and why)
 
 ### Discord authorization token
+
+> [!WARNING]
+> **Your token is full account access.** Anyone who obtains it can act as you on Discord’s API (read and delete messages, and more). Never paste it into untrusted sites, share screenshots with Privacy mode off, or install a repackaged userscript you have not audited.
 
 - The script needs a token to call the API on your behalf (search messages, delete messages you are allowed to delete).
 - By default it tries to read the token Discord already stored in **your browser’s** `localStorage` (the same origin as `discord.com`), or you can paste one into the **Token** field.
@@ -79,6 +88,9 @@ Things you can verify quickly:
 If anything in a fork or repackaged copy differs, treat that copy as untrusted until you diff it against this repository.
 
 ## Userscript managers and supply chain
+
+> [!WARNING]
+> **A malicious fork only needs one changed line** to exfiltrate your token or delete the wrong messages. Install from this repository (or a fork you have diffed), and **review manager updates** before accepting them — auto-update can silently replace the script.
 
 - Install from a source you trust (ideally this repo’s raw file or a release you compared to `main`).
 - Your userscript manager can update scripts automatically — review updates before accepting them if you care about reproducibility.

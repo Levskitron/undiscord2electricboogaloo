@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Undiscord 2: Electric Boogaloo
 // @description     Bulk-delete your Discord messages: fast wipe, server-wide cleanup, media backup gallery, checkpoints, and reliability fixes.
-// @version         1.3.1
+// @version         1.3.3
 // @author          Levskitron
 // @homepageURL     https://github.com/Levskitron/undiscord2electricboogaloo
 // @supportURL      https://github.com/Levskitron/undiscord2electricboogaloo/issues
@@ -10,13 +10,17 @@
 // @namespace       https://github.com/Levskitron/undiscord2electricboogaloo
 // @icon            https://victornpb.github.io/undiscord/images/icon128.png
 // @grant           GM_download
+// @grant           unsafeWindow
 // @attribution     Original project (https://github.com/victornpb/undiscord)
 // ==/UserScript==
 (function () {
 	'use strict';
 
 	/* rollup-plugin-baked-env */
-	const VERSION = '1.3.1';
+	const VERSION = '1.3.3';
+
+	/** Real page window (Tampermonkey isolated world vs Discord page) */
+	const pageWindow = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
 	const CHECKPOINT_KEY = 'undiscord_eb_checkpoint_v1';
 	const LOG_MAINTENANCE_INTERVAL_MS = 3600000;
 	const TOOL_NAME = 'Undiscord 2: Electric Boogaloo';
@@ -3166,7 +3170,7 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	  }
 	}
 
-	function getTokenFromWebpack(globalObj) {
+	function acquireWebpackRequire(globalObj) {
 	  const chunkKeys = Object.keys(globalObj).filter(
 	    k => k.startsWith('webpackChunk') && Array.isArray(globalObj[k]),
 	  );
@@ -3184,15 +3188,49 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	    req = globalObj.__webpack_require__;
 	  }
 	  if (!req?.c) throw new Error('webpack require not found');
-	  const mod = Object.values(req.c).find(m => m?.exports?.default?.getToken || m?.exports?.getToken);
-	  if (!mod) throw new Error('getToken module not found');
-	  if (mod.exports?.default?.getToken) return mod.exports.default.getToken();
-	  if (mod.exports?.getToken) return mod.exports.getToken();
-	  throw new Error('getToken export not callable');
+	  return req;
 	}
 
-	function getTokenFromClassicWebpackPush() {
-	  const chunk = window.webpackChunkdiscord_app;
+	/** Call getToken-style exports; skip modules where getToken is a non-function property */
+	function extractTokenFromModule(mod) {
+	  if (!mod?.exports) return '';
+	  const ex = mod.exports;
+	  const tryCall = (fn) => {
+	    if (typeof fn !== 'function') return '';
+	    try {
+	      return normalizeTokenCandidate(String(fn() ?? ''));
+	    } catch {
+	      return '';
+	    }
+	  };
+	  const tryString = (v) => normalizeTokenCandidate(typeof v === 'string' ? v : '');
+
+	  return (
+	    tryCall(ex?.default?.getToken)
+	    || tryCall(ex?.getToken)
+	    || tryCall(ex?.default?.getAuthorizationToken)
+	    || tryCall(ex?.getAuthorizationToken)
+	    || tryCall(typeof ex?.default === 'function' ? ex.default : null)
+	    || tryString(ex?.default?.getToken)
+	    || tryString(ex?.getToken)
+	    || ''
+	  );
+	}
+
+	function extractTokenFromWebpackReq(req) {
+	  for (const mod of Object.values(req.c)) {
+	    const token = extractTokenFromModule(mod);
+	    if (token) return token;
+	  }
+	  throw new Error('getToken module not found');
+	}
+
+	function getTokenFromWebpack(globalObj) {
+	  return extractTokenFromWebpackReq(acquireWebpackRequire(globalObj));
+	}
+
+	function getTokenFromClassicWebpackPush(globalObj = pageWindow) {
+	  const chunk = globalObj.webpackChunkdiscord_app;
 	  if (!Array.isArray(chunk) || typeof chunk.push !== 'function') {
 	    throw new Error('webpackChunkdiscord_app unavailable');
 	  }
@@ -3201,67 +3239,100 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	    modules = [];
 	    for (const c in e.c) modules.push(e.c[c]);
 	  }]);
-	  const mod = modules.find(m => m?.exports?.default?.getToken || m?.exports?.getToken);
-	  if (!mod) throw new Error('classic webpack: getToken module not found');
-	  if (mod.exports?.default?.getToken) return mod.exports.default.getToken();
-	  if (mod.exports?.getToken) return mod.exports.getToken();
-	  throw new Error('classic webpack: getToken not callable');
+	  for (const mod of modules) {
+	    const token = extractTokenFromModule(mod);
+	    if (token) return token;
+	  }
+	  throw new Error('classic webpack: getToken module not found');
+	}
+
+	function readTokenFromPageLocalStorage() {
+	  const attempts = [];
+	  try {
+	    const direct = normalizeTokenCandidate(pageWindow.localStorage?.getItem('token'));
+	    if (direct) return direct;
+	  } catch (err) {
+	    attempts.push(`direct: ${err?.message || err}`);
+	  }
+	  try {
+	    pageWindow.dispatchEvent(new Event('beforeunload'));
+	    const afterUnload = normalizeTokenCandidate(pageWindow.localStorage?.getItem('token'));
+	    if (afterUnload) return afterUnload;
+	  } catch (err) {
+	    attempts.push(`beforeunload: ${err?.message || err}`);
+	  }
+	  try {
+	    const iframeKey = normalizeTokenCandidate(readDiscordLocalStorageKey('token'));
+	    if (iframeKey) return iframeKey;
+	  } catch (err) {
+	    attempts.push(`iframe: ${err?.message || err}`);
+	  }
+	  log.verb('Storage token attempts:', attempts.join('; ') || 'empty');
+	  return '';
+	}
+
+	function readDiscordLocalStorageKey(key) {
+	  const doc = pageWindow.document;
+	  const iframe = doc.body.appendChild(doc.createElement('iframe'));
+	  try {
+	    return iframe.contentWindow.localStorage.getItem(key);
+	  } finally {
+	    try { iframe.remove(); } catch {}
+	  }
 	}
 
 	function getTokenFromPageContext() {
 	  return new Promise((resolve, reject) => {
 	    const reqId = `undiscord_token_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-	    const timeoutMs = 10000;
+	    const timeoutMs = 20000;
 	    let done = false;
 	    const cleanup = () => {
 	      if (done) return;
 	      done = true;
-	      window.removeEventListener('message', onMessage);
+	      pageWindow.removeEventListener('message', onMessage);
 	    };
 	    const onMessage = (event) => {
-	      if (event.source !== window) return;
+	      if (event.origin !== location.origin) return;
 	      const data = event.data;
 	      if (!data || data.source !== 'undiscord' || data.id !== reqId) return;
 	      cleanup();
 	      if (data.error) reject(new Error(data.error));
 	      else resolve(normalizeTokenCandidate(data.token || ''));
 	    };
-	    window.addEventListener('message', onMessage);
-	    const script = document.createElement('script');
+	    pageWindow.addEventListener('message', onMessage);
+	    const script = pageWindow.document.createElement('script');
 	    script.textContent = `(function(){try{
+function norm(t){if(typeof t!=='string')return'';t=t.trim();if(!t)return'';try{var p=JSON.parse(t);return typeof p==='string'?p:'';}catch(e){return t.replace(/^"|"$/g,'');}}
+function fromMod(m){if(!m||!m.exports)return'';var ex=m.exports,f=function(fn){if(typeof fn!=='function')return'';try{return norm(String(fn()||''));}catch(e){return'';}};return f(ex.default&&ex.default.getToken)||f(ex.getToken)||f(ex.default&&ex.default.getAuthorizationToken)||f(ex.getAuthorizationToken)||f(typeof ex.default==='function'?ex.default:null)||norm(typeof ex.default&&ex.default.getToken==='string'?ex.default.getToken:'')||norm(typeof ex.getToken==='string'?ex.getToken:'');}
 var g=window,req=null,keys=Object.keys(g).filter(function(k){return k.indexOf('webpackChunk')===0&&Array.isArray(g[k]);});
 for(var i=0;i<keys.length;i++){try{var ch=g[keys[i]];ch.push([['__undiscord_pc__'+Date.now()],{},function(r){req=r;}]);if(req&&req.c)break;req=null;}catch(e){}}
 if(!req&&typeof g.__webpack_require__==='function'&&g.__webpack_require__.c)req=g.__webpack_require__;
 if(!req||!req.c)throw new Error('webpack require not found');
-var mods=Object.values(req.c),mod=null;
-for(var j=0;j<mods.length;j++){var m=mods[j];if(m&&m.exports&&(m.exports.default&&m.exports.default.getToken||m.exports.getToken)){mod=m;break;}}
-if(!mod)throw new Error('getToken module not found');
-var t=mod.exports.default&&mod.exports.default.getToken?mod.exports.default.getToken():mod.exports.getToken();
-window.postMessage({source:'undiscord',id:'${reqId}',token:t||''},'*');
+var mods=Object.values(req.c),t='';
+for(var j=0;j<mods.length;j++){t=fromMod(mods[j]);if(t)break;}
+if(!t)throw new Error('getToken module not found');
+window.postMessage({source:'undiscord',id:'${reqId}',token:t},'*');
 }catch(e){window.postMessage({source:'undiscord',id:'${reqId}',error:String(e)},'*');}})();`;
 	    script.onerror = () => { cleanup(); reject(new Error('page-context script blocked')); };
-	    (document.head || document.documentElement).appendChild(script);
+	    (pageWindow.document.head || pageWindow.document.documentElement).appendChild(script);
 	    script.remove();
 	    setTimeout(() => { cleanup(); reject(new Error('token request timeout')); }, timeoutMs);
 	  });
 	}
 
 	async function getToken() {
-	  window.dispatchEvent(new Event('beforeunload'));
-	  const iframe = document.body.appendChild(document.createElement('iframe'));
-	  const LS = iframe.contentWindow.localStorage;
-	  const storageToken = normalizeTokenCandidate(LS.token);
+	  const storageToken = readTokenFromPageLocalStorage();
 	  if (storageToken) return storageToken;
 
 	  log.info('Token not in storage — trying webpack…');
 	  try {
-	    const t = normalizeTokenCandidate(getTokenFromWebpack(window));
+	    const t = normalizeTokenCandidate(getTokenFromWebpack(pageWindow));
 	    if (t) return t;
 	  } catch (err) {
 	    log.verb('Webpack token:', err?.message || err);
 	  }
 	  try {
-	    const t = normalizeTokenCandidate(getTokenFromClassicWebpackPush());
+	    const t = normalizeTokenCandidate(getTokenFromClassicWebpackPush(pageWindow));
 	    if (t) return t;
 	  } catch (err) {
 	    log.verb('Classic webpack:', err?.message || err);
@@ -3276,9 +3347,8 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t||''},'*');
 	}
 
 	function getAuthorId() {
-	  const iframe = document.body.appendChild(document.createElement('iframe'));
 	  try {
-	    const raw = iframe.contentWindow.localStorage.getItem('user_id_cache');
+	    const raw = readDiscordLocalStorageKey('user_id_cache');
 	    if (!raw) return '';
 	    try {
 	      const parsed = JSON.parse(raw);
@@ -3286,8 +3356,8 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t||''},'*');
 	    } catch {
 	      return String(raw).trim().replace(/^"|"$/g, '');
 	    }
-	  } finally {
-	    try { iframe.remove(); } catch {}
+	  } catch {
+	    return '';
 	  }
 	}
 
@@ -3327,7 +3397,8 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t||''},'*');
 	    log.verb(err);
 	    log.error('Could not automatically detect Authorization Token!');
 	    log.info(`Please make sure ${TOOL_NAME} is up to date`);
-	    log.debug('Alternatively, enter a token manually under Advanced → Token.');
+	    log.info('Tip: click Advanced → Token → Fill with DevTools closed, or paste a token manually.');
+	    log.debug('Firefox DevTools open can block autofill — close Ctrl+Shift+K and try Fill again.');
 	  }
 	  return '';
 	}

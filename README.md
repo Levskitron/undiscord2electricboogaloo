@@ -250,3 +250,9 @@ Per the MIT license, derivatives must retain attribution to the original project
 > Original project: [https://github.com/victornpb/undiscord](https://github.com/victornpb/undiscord)
 
 The userscript header includes `@attribution` pointing to the upstream repository.
+
+### Community credits
+
+Electric Boogaloo is **not** a word-for-word copy of other Undiscord forks. It reimplements ideas from the community (reliability fixes, media gallery, empty-page retries, server-wide batching) in **this project’s own code**, alongside original UI and features (run profiles, checkpoints, docs).
+
+See **[CREDITS.md](./CREDITS.md)** for the full lineage table and links to [SuicidaI-Idol](https://github.com/SuicidaI-Idol/undiscord), [AerialJustice](https://github.com/AerialJustice/undiscord-fixed-2025), [TheCellMaster](https://github.com/TheCellMaster/undiscord), and upstream Undiscord.

@@ -27,8 +27,9 @@
 12. [When something goes wrong](#when-something-goes-wrong)
 13. [Privacy in plain English](#privacy-in-plain-english)
 14. [Glossary](#glossary)
-15. [FAQ](#faq)
-16. [More help](#more-help)
+15. [Where did this tool come from?](#where-did-this-tool-come-from)
+16. [FAQ](#faq)
+17. [More help](#more-help)
 
 ---
 
@@ -703,6 +704,36 @@ Full details: **[PRIVACY.md](./PRIVACY.md)**
 
 ---
 
+## Where did this tool come from?
+
+**Undiscord 2: Electric Boogaloo** is a maintained fork of the original **[Undiscord](https://github.com/victornpb/undiscord)** by Victornpb — the project most people mean when they say “Undiscord.” Levskitron maintains this version; Victornpb and Discord do not.
+
+> [!IMPORTANT]
+> **We did not copy other forks word-for-word.** This file is our own implementation (~4,000+ lines). Other community forks solved similar problems; we **studied their approaches** and **rebuilt** those behaviors here (same goals, different code, UI, and packaging).
+
+### Who we thank (ideas & fixes, not endorsement)
+
+| Project | What we learned from them |
+|---------|---------------------------|
+| **[Victornpb / Undiscord](https://github.com/victornpb/undiscord)** | The whole concept — search, filters, delete loop, bulk archive import. **Required MIT credit.** |
+| **[TheCellMaster / undiscord](https://github.com/TheCellMaster/undiscord)** | **Empty page retries** — don’t stop forever when Discord returns an empty search page. |
+| **[SuicidaI-Idol / undiscord](https://github.com/SuicidaI-Idol/undiscord)** | **Reliability** patterns: network retries, better 503 handling, history scan when search fails, guild search fallbacks, finishing sooner when the index catches up. |
+| **[AerialJustice / undiscord-fixed-2025](https://github.com/AerialJustice/undiscord-fixed-2025)** | **Review photos & backup** — pause on batches, show a gallery, download attachments, then choose what to delete. |
+
+### What is unique to Electric Boogaloo
+
+- **Run profiles** (Fast / Careful / Photos / Server / Custom)  
+- This **sidebar UI**, privacy mode, session logs, checkpoints  
+- **Server wipe** with pre-count + resume  
+- **Author ID** safeguards and this **USER_GUIDE** / **PRIVACY** docs  
+
+Full detail and links: **[CREDITS.md](./CREDITS.md)**.
+
+> [!NOTE]
+> Using ideas from another open-source fork is normal in this ecosystem; it does **not** mean those authors reviewed or approve this repo. If you want the exact script someone else ships, use **their** install link — not ours.
+
+---
+
 ## FAQ
 
 **Is this official Discord?**  
@@ -742,6 +773,7 @@ Because the tool still deletes **one message per API call** and must **wait** be
 | Resource | Link |
 |----------|------|
 | Project README (features & install) | [README.md](./README.md) |
+| Credits & fork lineage | [CREDITS.md](./CREDITS.md) |
 | Privacy & security | [PRIVACY.md](./PRIVACY.md) |
 | Original Undiscord wiki (filter help links in UI) | [github.com/victornpb/undiscord/wiki](https://github.com/victornpb/undiscord/wiki) |
 | Report bugs | [GitHub Issues](https://github.com/Levskitron/undiscord2electricboogaloo/issues) |

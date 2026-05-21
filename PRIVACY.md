@@ -146,5 +146,6 @@ If you find code that contradicts this document, please [open an issue](https://
 ## Related
 
 - [USER_GUIDE.md](./USER_GUIDE.md) — plain-language walkthrough for everyone  
+- [CREDITS.md](./CREDITS.md) — upstream and community fork attribution  
 - [README.md](./README.md) — installation, run profiles, configuration, usage  
 - [LICENSE](./LICENSE) — MIT license and attribution  

@@ -35,7 +35,7 @@ What you delete and which filters you use is **your business**. This project is 
 
 - A **Chromium- or Firefox-based** browser with Discord open at `https://discord.com/app` (or channel URLs)
 - A **userscript manager**, e.g. [Tampermonkey](https://www.tampermonkey.net/), [Violentmonkey](https://violentmonkey.github.io/), or [Greasemonkey](https://www.greasespot.net/) (Firefox)
-- For organized **file downloads** (media backup, log export): a manager that supports **`@grant GM_download`** (Tampermonkey/Violentmonkey). Without it, the script falls back to normal browser downloads.
+- Grants used: **`GM_download`** (log/media saves), **`unsafeWindow`** and **`GM_addElement`** (token autofill and client-like API headers). Without `GM_download`, saves fall back to normal browser downloads.
 
 ## Installation
 
@@ -45,7 +45,7 @@ What you delete and which filters you use is **your business**. This project is 
 1. Install a userscript manager.
 2. Open the raw script (your manager should offer to install):
    - [`undiscord-electric-boogaloo.user.js`](https://github.com/Levskitron/undiscord2electricboogaloo/raw/main/undiscord-electric-boogaloo.user.js)
-3. When prompted, allow **`GM_download`** if asked — used only to save log/media files **to your computer**, not to call external servers.
+3. When prompted, allow **`GM_download`**, **`unsafeWindow`**, and **`GM_addElement`** if asked — downloads save log/media **to your computer** only; the other grants help token autofill and client-like API headers in your Discord tab.
 4. Open [Discord](https://discord.com/app) in the browser.
 5. Click the **trash** icon in the channel toolbar (or the floating fallback button) to open the panel.
 
@@ -86,7 +86,7 @@ Profiles set sensible defaults. Changing any control manually switches the profi
 ### Deletion & search
 
 - Bulk delete **your** messages in a channel, DM, comma-separated channel list, or **entire server** (all message channels).
-- **Client-like API headers** on every `discord.com/api` call (`X-Super-Properties`, locale, timezone, channel `Referer`) — same idea as the web app, not “Authorization-only” deletes. Works with **Tampermonkey**, **Violentmonkey**, **Greasemonkey**, and other managers that grant `unsafeWindow` / `GM_addElement`.
+- **Client-like API headers** on every `discord.com/api` call (`X-Super-Properties`, locale, timezone, channel `Referer`, `credentials: include`) — same idea as the web app, not “Authorization-only” deletes. **Full** vs **Partial** mode is shown in the fingerprint bar above the log; optional **Debug API headers** footer toggle logs safe request summaries.
 - Discord **search API** with guild/channel scope fallbacks and optional **channel history scan** when search is unavailable (`50024`).
 - **Hybrid time-remaining** estimate (modeled delays + observed throughput + rate-limit history).
 - **Rate-limit aware** — raises delays on HTTP 429; retries empty search pages; network retry on 5xx / transient failures.
@@ -120,11 +120,13 @@ Profiles set sensible defaults. Changing any control manually switches the profi
 - **Auto-save & clear log hourly** → `Undiscord_Logs/undiscord_log_*.txt` (optional **messages only**).
 - **Auto-save log on stop / finish** (optional messages-only).
 - **Auto-clear log hourly** without saving.
-- **Copy log** to clipboard; **Clear log**; **Verbose log** and **Log each deletion** (footer toggles).
+- **API fingerprint bar** (above log) — **Full** / **Partial** / unknown; shows locale, timezone, and whether `X-Super-Properties` is active (refreshed on **▶ Delete**).
+- **Copy log** to clipboard; **Clear log**; footer toggles: **Auto scroll**, **Verbose log**, **Log each deletion**, **Debug API headers**.
 - **Privacy mode** — masks IDs/token in the form and redacts log content (toggle anytime).
-- **Account token vault** — red, collapsed danger section with acknowledgment gate; **background auto-fill** (default on) so most users never open it.
+- **Account token vault** — red sidebar section (last item, below Advanced); acknowledgment gate; **background auto-fill** (default on); gated **Copy**.
 - **Auto-fill IDs when I change channel** (default on).
-- Sidebar sections: Run profile, Target, Filters, Media review, Limits, Bulk archive, Session & logs, Advanced.
+- Sidebar sections: Run profile, Target, Filters, Media review, Limits, Bulk archive, Session & logs, Advanced, **Account token**.
+- Default panel width **1100px** (min **880px**); drag edges/corners to resize within ~96% of viewport.
 - Toolbar trash button with resilient mount; floating fallback if Discord re-renders the header.
 
 ### Bulk archive import
@@ -156,18 +158,20 @@ Profiles set sensible defaults. Changing any control manually switches the profi
 | **Advanced** | Delays, empty-page retries, confirm, unarchive |
 | **Account token** | Own sidebar section (last item, below Advanced); gated vault, auto-fill, optional Copy |
 
-### Toolbar & footer
+### Toolbar, fingerprint bar & footer
 
 | Control | Action |
 |---------|--------|
-| **▶︎ Delete** | Start run |
+| **▶︎ Delete** | Start run; refresh API fingerprint mode |
 | **🛑 Stop** | Cancel run (panel can stay open or closed) |
-| **Copy log** | Copy log panel text to clipboard |
-| **Clear log** | Empty log panel |
+| **Copy log** / **Clear log** | Clipboard export or empty log panel |
 | **Privacy mode** | Redact sensitive UI/log content |
-| **Auto scroll** | Scroll log to latest line |
+| **Fingerprint bar** | **Full** = `X-Super-Properties` + locale/timezone/Referer; **Partial** = reduced headers (deletes may still work) |
+| **Progress row** (footer, while running) | Segmented **% (n/total)**, **Elapsed**, **Remaining** (full width) |
+| **Auto scroll** | Keep log pinned to the latest line |
 | **Verbose log** | More technical lines during run |
 | **Log each deletion** | Log every deleted message in the panel |
+| **Debug API headers** | Safe `[API debug]` summaries per endpoint (no token/cookie/full SP) |
 
 ## Common workflows
 

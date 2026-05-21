@@ -2,7 +2,7 @@
 
 **Who this is for:** Anyone who wants to delete their own messages on Discord — no coding experience required. Developers can use the same guide; technical details are in boxes where helpful.
 
-**Version covered:** 1.3.1 · Script: [`undiscord-electric-boogaloo.user.js`](./undiscord-electric-boogaloo.user.js)
+**Version covered:** 1.4.0 · Script: [`undiscord-electric-boogaloo.user.js`](./undiscord-electric-boogaloo.user.js)
 
 > [!CAUTION]
 > **Using this tool can get your Discord account suspended or permanently banned.** It automates your normal user account (what Discord calls a “self-bot”) — not an official bot. That breaks Discord’s rules even when you only delete **your own** messages.
@@ -187,7 +187,7 @@ When the manager asks for permissions, allow **GM_download** (save logs/media to
    [undiscord-electric-boogaloo.user.js](https://github.com/Levskitron/undiscord2electricboogaloo/raw/main/undiscord-electric-boogaloo.user.js)
 2. Tampermonkey should show an **Install** screen.
 3. Click **Install**.
-4. If asked about **GM_download**, allow it (for backups and logs).
+4. If asked about permissions, allow **GM_download** (backups and logs), **unsafeWindow**, and **GM_addElement** when offered (token autofill and client-like API headers).
 
 **Manual install:** Copy the file from this folder into a new script in Tampermonkey and save.
 
@@ -238,13 +238,23 @@ Fold-out sections you can open and close:
 | **Advanced** | Speed, delays, expert options |
 | **⚠ Account token** | Last item on the sidebar — login token danger zone (below Advanced) |
 
-### Bottom (actions and log)
+### Right side (toolbar, fingerprint, log, footer)
 
-| Button / area | What it does |
-|---------------|--------------|
-| **▶ Delete** | Start deleting |
+| Area | What it does |
+|------|--------------|
+| **Toolbar** | **▶ Delete**, **🛑 Stop**, **Copy log**, **Clear log**, **Privacy mode** |
+| **Fingerprint bar** (green/amber box above the log) | Shows **Full** or **Partial** API mode before and during runs. **Full** means client-like headers including `X-Super-Properties`. Updates when you press **Delete**. |
+| **Log area** | Progress, errors, page counts, optional per-delete lines |
+| **Footer — progress row** | While running: **% (deleted/total)**, **Elapsed**, **Remaining** on one line |
+| **Footer — checkboxes** | **Auto scroll**, **Verbose log**, **Log each deletion**, **Debug API headers** (safe API summaries; off by default) |
+
+> [!TIP]
+> You can **resize** the panel by dragging the bottom-right corner (or edges). Default width is wider than older versions so progress and checkboxes fit on screen.
+
+| Button | What it does |
+|--------|--------------|
+| **▶ Delete** | Start deleting (also checks API fingerprint mode) |
 | **🛑 Stop** | Stop deleting (use this — closing the panel is not enough) |
-| **Log area** | Shows progress, errors, and how many messages were deleted |
 | **Copy log / Clear log** | Copy text out or wipe the log window |
 | **Privacy mode** | Hides sensitive numbers on screen (good if someone is watching) |
 
@@ -480,7 +490,7 @@ Same as Job A, but set **Run profile** to **Careful wipe** and read the confirma
 ### Job G — Only delete messages from a certain date range
 
 1. Open **Limits**.
-2. Use **Start date** / **End date** (not both with message ID limits at the same time).
+2. Use **Posted after** / **Posted before** (not both with message ID limits at the same time).
 3. Fill **Target**, pick profile, **Delete**.
 
 ---
@@ -554,7 +564,7 @@ Same as Job A, but set **Run profile** to **Careful wipe** and read the confirma
 | Setting | Simple explanation |
 |---------|-------------------|
 | **After message / Before message** | Only delete messages newer or older than a specific message ID. **Pick** reads from chat. |
-| **Start date / End date** | Only delete in that date range. |
+| **Posted after / Posted before** | Only delete in that date range. |
 
 Do not mix message ID limits and date limits in ways that confuse you — use one approach at a time unless you know what you are doing.
 
@@ -619,19 +629,28 @@ This is its **own** red section — the **last** item in the sidebar, directly *
 
 ## Footer buttons
 
+Toolbar buttons (**▶ Delete**, **🛑 Stop**, **Copy log**, **Clear log**, **Privacy mode**) are at the **top** of the right side. The **footer** at the bottom has the progress row and checkboxes.
+
 | Control | What it does |
 |---------|--------------|
-| **▶ Delete** | Starts the run |
-| **🛑 Stop** | Cancels the run — use this to actually stop |
-| **Copy log** | Copies the log text to clipboard |
-| **Clear log** | Empties the log window |
-| **Privacy mode** | Masks IDs and sensitive text in the form and log |
+| **Progress row** | Only visible during a run: percent and count, then **Elapsed** and **Remaining** as separate labeled segments |
+| **Auto scroll** | Keeps the log scrolled to the newest line (default on) |
+| **Verbose log** | More technical details in the log |
+| **Log each deletion** | Writes every single deleted message in the log (very long on big jobs) |
+| **Debug API headers** | Logs a short `[API debug]` block per API endpoint type (method, path, fingerprint mode, which headers are present — **not** your token or full `X-Super-Properties`) |
 
 > [!TIP]
 > Leave **Privacy mode** on if you stream, share your screen, or use Discord in public. It hides IDs and token fields from view — it does not encrypt your disk or stop a malicious script.
-| **Auto scroll** | Log follows new lines automatically |
-| **Verbose log** | More technical details in the log |
-| **Log each deletion** | Writes every single deleted message in the log (very long on big jobs) |
+
+### API fingerprint bar (above the log)
+
+| Pill | Meaning |
+|------|---------|
+| **Full** (green) | `X-Super-Properties` plus locale, timezone, and channel Referer — closest match to the Discord web app |
+| **Partial** (amber) | Token + locale/timezone/Referer, but no `X-Super-Properties` — deletes often still work |
+| **—** (grey) | Not checked yet — press **▶ Delete** to probe |
+
+The bar sits **outside** the scrollable log so it stays the correct width. If **Full** says **cached**, the script reused headers captured while you browsed Discord.
 
 ---
 
@@ -676,7 +695,8 @@ This is its **own** red section — the **last** item in the sidebar, directly *
 
 - Check Author ID, Server ID, and Channel ID.
 - For server wipe, Server ID must not be `@me`.
-- Wait a few seconds for **background auto-fill** (badge should say **Ready**), or open **⚠ Account token** at the bottom of the sidebar, unlock, and click **Fill**.
+- Wait a few seconds for **background auto-fill** (token badge **Ready** under **⚠ Account token**), or open that section, unlock, and click **Fill**.
+- Check the **fingerprint bar**: **Partial** is often enough; if deletes fail with auth errors, scroll the target channel in Discord and try **Delete** again so headers can be captured.
 
 ### Errors on other people’s messages (wrong author)
 
@@ -692,6 +712,7 @@ This is its **own** red section — the **last** item in the sidebar, directly *
 - The script runs **only in your browser** on Discord’s website.
 - It talks to **Discord’s servers** to search and delete — not to this GitHub project’s servers (there are none).
 - Your **token** stays on your computer and is sent to **discord.com** only, like the normal website.
+- **API fingerprint** data (`X-Super-Properties`, locale, timezone) is built or captured in your tab and sent only on **discord.com/api** requests — not to this GitHub project.
 - Optional **log files** and **photo backups** are saved **on your computer** only.
 - **Server wipe resume** data is stored in your browser’s **local storage** until you resume or discard.
 
@@ -719,6 +740,9 @@ Full details: **[PRIVACY.md](./PRIVACY.md)**
 | **403** | “Not allowed” — often trying to delete someone else’s message. |
 | **Checkpoint** | Saved list of channels left to do after you stopped a server wipe. |
 | **GM_download** | Tampermonkey feature to save files into folders on your PC. |
+| **API fingerprint** | How closely script requests match the Discord web client (Full vs Partial). |
+| **X-Super-Properties** | Encoded client metadata header Discord’s web app sends; used in **Full** mode. |
+| **Debug API headers** | Optional footer toggle for safe request summaries in the log. |
 
 ---
 
@@ -727,7 +751,7 @@ Full details: **[PRIVACY.md](./PRIVACY.md)**
 **Undiscord 2: Electric Boogaloo** is a maintained fork of the original **[Undiscord](https://github.com/victornpb/undiscord)** by Victornpb — the project most people mean when they say “Undiscord.” Levskitron maintains this version; Victornpb and Discord do not.
 
 > [!IMPORTANT]
-> **We did not copy other forks word-for-word.** This file is our own implementation (~4,000+ lines). Other community forks solved similar problems; we **studied their approaches** and **rebuilt** those behaviors here (same goals, different code, UI, and packaging).
+> **We did not copy other forks word-for-word.** This file is our own implementation (single userscript, 5,000+ lines). Other community forks solved similar problems; we **studied their approaches** and **rebuilt** those behaviors here (same goals, different code, UI, and packaging).
 
 ### Who we thank (ideas & fixes, not endorsement)
 
@@ -744,7 +768,8 @@ Full details: **[PRIVACY.md](./PRIVACY.md)**
 - This **sidebar UI**, privacy mode, session logs, checkpoints  
 - **Server wipe** with pre-count + resume  
 - **Author ID** safeguards and this **USER_GUIDE** / **PRIVACY** docs  
-- **Client-like API headers** (v1.4+) so deletes look like the web app, not bare token-only requests  
+- **Client-like API headers** (v1.4+) — Full/Partial fingerprint bar, `discordApiFetch`, synthetic/captured `X-Super-Properties`  
+- **Account token vault** (v1.4+) — gated sidebar section, background autofill, masked field  
 
 Full detail and links: **[CREDITS.md](./CREDITS.md)**.
 

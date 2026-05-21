@@ -1,6 +1,6 @@
 # Privacy & security
 
-**Undiscord 2: Electric Boogaloo** (v1.3.0) is a client-side userscript. It runs entirely in your browser on `discord.com`. There is no backend, no account system, and no analytics operated by this project.
+**Undiscord 2: Electric Boogaloo** (v1.4.0) is a client-side userscript. It runs entirely in your browser on `discord.com`. There is no backend, no account system, and no analytics operated by this project.
 
 This document explains what the script does with your data so you can decide whether you are comfortable using it.
 
@@ -35,16 +35,26 @@ The script header requests:
 
 ```text
 @grant GM_download
+@grant GM_addElement
+@grant unsafeWindow
 ```
 
-**What that is used for (and only for):**
+| Grant | Purpose |
+|-------|---------|
+| **GM_download** | Save **log exports** (`Undiscord_Logs/*.txt`) and **media backups** (`Undiscord_Media/...`) to your disk. Uses `blob:` URLs or Discord attachment URLs — **not** sent to this project. Falls back to a normal `<a download>` click if unavailable. |
+| **unsafeWindow** | Reach Discord’s real page `window` (not only the userscript sandbox) so `fetch()` and header capture behave closer to the open Discord tab. |
+| **GM_addElement** | Inject short-lived page-context scripts (token / `X-Super-Properties` capture) when other autofill paths fail. |
 
-- Saving **log exports** to your disk as `Undiscord_Logs/*.txt` (hourly auto-save and/or save on stop).
-- Saving **media backups** during interactive review to `Undiscord_Media/...` on your disk.
+**What is not requested:** `GM_xmlhttpRequest` to arbitrary domains or hidden telemetry hosts. Core search/delete use `fetch()` to **`discord.com` only**.
 
-`GM_download` is provided by your userscript manager. Downloads use `blob:` URLs or Discord attachment URLs as the source; they are **not** sent to Levskitron or a third-party host. If `GM_download` is unavailable, the script falls back to a normal browser `<a download>` click.
+### API fingerprint data (v1.4+)
 
-**What is not requested:** `GM_xmlhttpRequest` to arbitrary domains, clipboard APIs, or cross-origin requests bypassing the browser — core search/delete still use `fetch()` to `discord.com` from the page context.
+To send **client-like headers** (`X-Super-Properties`, locale, timezone, channel `Referer`), the script may:
+
+- Read headers from Discord API traffic you already generate in the tab (hook on page `fetch` / XHR).
+- Build a **synthetic** `X-Super-Properties` blob from your browser UA, locale, timezone, and a build number scraped from the page (or a documented fallback).
+
+That data stays **in memory in your tab** (and optional short-lived page globals for capture). It is **not** uploaded to this GitHub project. It is sent only on **`discord.com/api`** requests the script makes for search/delete, like the web app.
 
 ## What the script stores locally
 
@@ -54,7 +64,7 @@ The script header requests:
 > **Your token is full account access.** Anyone who obtains it can act as you on Discord’s API. Never paste it into untrusted sites, share screenshots with Privacy mode off, or install a repackaged script you have not audited.
 
 - Needed to search and delete on your behalf.
-- **Fill** tries, in order: Discord `localStorage` (via a same-origin iframe), webpack module scan, classic webpack chunk push, then a short-lived **page-context script** that posts the token back via `window.postMessage` (no network; only if earlier methods fail).
+- **Background auto-fill** (default on) and **Fill** try, in order: Discord `localStorage` (via a same-origin iframe), webpack module scan, classic webpack chunk push, sniffing from page API traffic, then a short-lived **page-context script** that posts the token back via `window.postMessage` (no network to this project; only if earlier methods fail).
 - You may paste a token manually under **⚠ Account token** (own sidebar section, below Advanced).
 - The token is sent in the `Authorization` header to **`discord.com` only** — not to this repository.
 - **We do not log, copy, or transmit your token to our servers** (we have none).
@@ -120,12 +130,13 @@ Single file: [`undiscord-electric-boogaloo.user.js`](./undiscord-electric-boogal
 
 Quick checks:
 
-1. **Header** — `@match` limited to `discord.com`; `@grant GM_download` only.
-2. **Network** — search for `fetch(`; deletion/search should target `https://discord.com/api/v9/`.
+1. **Header** — `@match` limited to `discord.com`; grants are `GM_download`, `GM_addElement`, `unsafeWindow` only.
+2. **Network** — search for `discordApiFetch` / `fetch(`; deletion/search should target `https://discord.com/api/v9/`.
 3. **No hidden telemetry** — no unknown domains in the core loop.
-4. **Token** — `getToken()` / `fillToken()`; no `fetch` of the token to third parties.
-5. **Downloads** — `GM_download` / `saveLogToFile` use local blob URLs or Discord CDN attachment URLs.
-6. **Checkpoint** — `localStorage` key `undiscord_eb_checkpoint_v1`; inspect `saveCheckpoint` / `loadCheckpoint`.
+4. **Token** — `fillToken()` / `tryAutofillToken()`; no `fetch` of the token to third parties.
+5. **API fingerprint** — `buildDiscordApiHeaders`, `ensureClientHeadersReady`; no exfiltration of full `X-Super-Properties` in logs unless you enable **Debug API headers** (summaries only).
+6. **Downloads** — `GM_download` / `saveLogToFile` use local blob URLs or Discord CDN attachment URLs.
+7. **Checkpoint** — `localStorage` key `undiscord_eb_checkpoint_v1`; inspect `saveCheckpoint` / `loadCheckpoint`.
 
 If a fork or mirror differs, diff it against this repository before trusting it.
 

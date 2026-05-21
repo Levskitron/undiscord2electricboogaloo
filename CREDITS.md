@@ -15,7 +15,7 @@ Per MIT, derivatives must keep attribution to victornpb/undiscord in code, READM
 
 **No — not word-for-word.**
 
-Electric Boogaloo is **this repository’s own codebase** (~4,000+ lines in a single userscript file). It is not a merge of, nor a byte-for-byte copy of, SuicidaI-Idol, AerialJustice, TheCellMaster, or GreasyFork re-uploads.
+Electric Boogaloo is **this repository’s own codebase** (single userscript file, 5,000+ lines as of v1.4.0). It is not a merge of, nor a byte-for-byte copy of, SuicidaI-Idol, AerialJustice, TheCellMaster, or GreasyFork re-uploads.
 
 What we did instead:
 
@@ -47,7 +47,10 @@ Examples of work that is **Electric Boogaloo–specific** (design/integration, n
 - Checkpoint resume (`localStorage`, `undiscord_eb_checkpoint_v1`)  
 - Author ID required + autofill hardening (v1.3.1)  
 - Hybrid ETA (`calcEtr`), run profiles wiring, README / PRIVACY / USER_GUIDE  
-- Optional **Unarchive threads before delete** (toggle; behavior implemented here)
+- Optional **Unarchive threads before delete** (toggle; behavior implemented here)  
+- **Client-like API headers** (v1.4.0) — `discordApiFetch`, Full/Partial fingerprint bar, page traffic capture, synthetic `X-Super-Properties`, optional **Debug API headers** log toggle  
+- **Account token vault** (v1.4.0) — dedicated sidebar danger section, acknowledgment gate, background autofill, gated Copy, masked token field  
+- **Main panel layout** (v1.4.0) — fingerprint bar outside scrollable log, resizable window (default 1100px), segmented footer progress
 
 ## Third-party assets
 

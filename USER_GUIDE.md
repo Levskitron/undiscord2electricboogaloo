@@ -820,7 +820,7 @@ Because the tool still deletes **one message per API call** and must **wait** be
 | Credits & fork lineage | [CREDITS.md](./CREDITS.md) |
 | Privacy & security | [PRIVACY.md](./PRIVACY.md) |
 | Original Undiscord wiki (filter help links in UI) | [github.com/victornpb/undiscord/wiki](https://github.com/victornpb/undiscord/wiki) |
-| Report bugs | [GitHub Issues](https://github.com/Levskitron/undiscord2electricboogaloo/issues) |
+| Report bugs | [GitHub Issues](https://github.com/Levskitron/undiscord2electricboogaloo/issues) — pick a template (**Deletion / search** for failed runs) |
 
 ---
 

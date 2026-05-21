@@ -1,0 +1,157 @@
+name: Deletion / search not working
+description: The run fails, stops early, rate limits, auth errors, wrong counts, or fingerprint problems.
+title: "[Run]: "
+labels: ["bug", "run"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a **run problem**. This template helps maintainers reproduce deletion/search issues.
+
+        > **Never paste your Discord token, cookies, or full `X-Super-Properties` values.** Use **Privacy mode**, redact IDs if you prefer, and paste only **error lines** or `[API debug]` summaries from the log.
+
+        Before submitting, check **[USER_GUIDE — When something goes wrong](https://github.com/Levskitron/undiscord2electricboogaloo/blob/main/USER_GUIDE.md#when-something-goes-wrong)**.
+
+  - type: input
+    id: version
+    attributes:
+      label: Script version
+      description: Shown in the sidebar footer (e.g. 1.4.0) or in the userscript header.
+      placeholder: "1.4.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: profile
+    attributes:
+      label: Run profile
+      options:
+        - Fast wipe (default)
+        - Careful wipe
+        - Review photos & backup
+        - Server wipe (all channels)
+        - Custom
+    validations:
+      required: true
+
+  - type: dropdown
+    id: target_type
+    attributes:
+      label: What were you deleting?
+      options:
+        - Single channel / DM
+        - Comma-separated channel list
+        - Entire server (all message channels)
+        - Imported Bulk archive (index.json)
+    validations:
+      required: true
+
+  - type: input
+    id: manager
+    attributes:
+      label: Userscript manager
+      placeholder: "Violentmonkey 2.37 / Tampermonkey 5.x / Greasemonkey …"
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser & OS
+      placeholder: "Firefox 151 / Windows 11"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: fingerprint
+    attributes:
+      label: API fingerprint bar (above log)
+      description: What did the green/amber box show when you pressed Delete?
+      options:
+        - Full (green)
+        - Partial (amber)
+        - — / unknown (grey)
+        - Did not notice / not shown
+    validations:
+      required: true
+
+  - type: dropdown
+    id: token_status
+    attributes:
+      label: Account token badge (sidebar)
+      options:
+        - Ready
+        - Not set
+        - Did not check
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: toggles
+    attributes:
+      label: Footer / log toggles during the run
+      options:
+        - label: Auto scroll
+        - label: Verbose log
+        - label: Log each deletion
+        - label: Debug API headers
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What actually happened?
+      description: Include HTTP codes if shown (403, 429, 50024, etc.), whether Stop worked, and approximate counts (deleted / skipped / failed).
+    validations:
+      required: true
+
+  - type: textarea
+    id: log_excerpt
+    attributes:
+      label: Relevant log lines
+      description: Paste the last ~30 lines from the log panel, or `[API debug]` blocks only. Redact usernames/message text if needed.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: settings
+    attributes:
+      label: Key settings (no secrets)
+      description: Search/delete delays, empty page retries, filters, Author ID filled (yes/no), server wipe / checkpoint / NSFW toggles.
+      placeholder: |
+        Search delay: 30s, Delete delay: 1s, Empty page retries: 2
+        Author ID: filled via Me, guild @me, channel …
+        Filters: none
+    validations:
+      required: false
+
+  - type: dropdown
+    id: reproduced
+    attributes:
+      label: Can you reproduce it?
+      options:
+        - Yes, every time
+        - Sometimes
+        - Only once
+        - Not tried again
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I read the User Guide troubleshooting section
+          required: true
+        - label: I am using the official script from this repository (not an unknown re-upload)
+          required: true
+        - label: I did not include my token, cookie, or full X-Super-Properties in this report
+          required: true

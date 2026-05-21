@@ -1,0 +1,57 @@
+name: Feature request
+description: Suggest a new feature or improvement to Electric Boogaloo.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Suggest something new or improved. Feature requests help prioritize work — they are not guarantees.
+
+        Check **[CREDITS.md](https://github.com/Levskitron/undiscord2electricboogaloo/blob/main/CREDITS.md)** if your idea already exists in another Undiscord fork (we may prefer reimplementing in our own style).
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Who is affected and what pain point do they have today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How should it work from a user perspective?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds, other tools, or simpler approaches you thought of.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Rough scope
+      options:
+        - Small UI / wording tweak
+        - New sidebar option or profile behavior
+        - Deletion / search / API reliability
+        - Media backup / logs / checkpoints
+        - Documentation only
+        - Not sure
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: willing
+    attributes:
+      label: Contribution
+      options:
+        - label: I am willing to open a pull request for this (optional)
+        - label: I have checked that this is not already in README / USER_GUIDE as an existing feature

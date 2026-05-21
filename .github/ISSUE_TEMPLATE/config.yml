@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: User Guide (start here)
+    url: https://github.com/Levskitron/undiscord2electricboogaloo/blob/main/USER_GUIDE.md
+    about: Plain-language walkthrough, profiles, every setting, and troubleshooting.
+  - name: README & features
+    url: https://github.com/Levskitron/undiscord2electricboogaloo/blob/main/README.md
+    about: Install, run profiles, configuration reference.
+  - name: Privacy & security
+    url: https://github.com/Levskitron/undiscord2electricboogaloo/blob/main/PRIVACY.md
+    about: What the script stores locally and where data is sent.
+  - name: Original Undiscord (upstream)
+    url: https://github.com/victornpb/undiscord/issues
+    about: Bugs in the original victornpb project — not this fork.

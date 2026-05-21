@@ -1,0 +1,56 @@
+name: Documentation issue
+description: README, USER_GUIDE, PRIVACY, or in-script text is wrong or unclear.
+title: "[Docs]: "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Report missing, outdated, or confusing **documentation** (not a code bug).
+
+        Docs live in: `README.md`, `USER_GUIDE.md`, `PRIVACY.md`, `CREDITS.md`, and UI strings in `undiscord-electric-boogaloo.user.js`.
+
+  - type: dropdown
+    id: file
+    attributes:
+      label: Which doc?
+      options:
+        - README.md
+        - USER_GUIDE.md
+        - PRIVACY.md
+        - CREDITS.md
+        - In-script UI / tooltips
+        - GitHub issue templates
+        - Multiple / not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: location
+    attributes:
+      label: Section or heading (if known)
+      placeholder: "e.g. USER_GUIDE → Footer buttons → API fingerprint bar"
+    validations:
+      required: false
+
+  - type: textarea
+    id: issue
+    attributes:
+      label: What is wrong or missing?
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested wording (optional)
+      description: If you have clearer text, paste it here.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: version
+    attributes:
+      label: Version
+      options:
+        - label: I checked this against the current main branch (v1.4.0 era)

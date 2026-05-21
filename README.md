@@ -239,7 +239,9 @@ For local data handling (token, logs, checkpoints, downloads), see **[PRIVACY.md
 
 Issues and pull requests are welcome: [github.com/Levskitron/undiscord2electricboogaloo/issues](https://github.com/Levskitron/undiscord2electricboogaloo/issues).
 
-When changing behavior, update **README.md**, **PRIVACY.md**, and the in-script version in the userscript header and `VERSION` constant.
+Click **New issue** to pick a template (deletion problems, UI bugs, questions, features, docs). Templates live in [`.github/ISSUE_TEMPLATE/`](./.github/ISSUE_TEMPLATE/) — see that folder’s README for how they work. **Do not paste your Discord token** in issues; use log excerpts and `[API debug]` lines instead.
+
+When changing behavior, update **README.md**, **PRIVACY.md**, **USER_GUIDE.md** (if user-facing), and the in-script version in the userscript header and `VERSION` constant.
 
 ## License
 

@@ -1,0 +1,62 @@
+name: Question / help using the tool
+description: How do I…? — usage, settings, timelines, account risk (not a code bug).
+title: "[Question]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ask for **help using** Undiscord 2: Electric Boogaloo.
+
+        **Start here:** [USER_GUIDE.md](https://github.com/Levskitron/undiscord2electricboogaloo/blob/main/USER_GUIDE.md) — install, profiles, every setting, FAQ, troubleshooting.
+
+        If something is **broken** (errors in the log, UI glitch), use **Deletion / search not working** or **Bug report** instead so we get reproducible details.
+
+        > We cannot recover deleted messages, reset Discord bans, or access your account. Maintainers only see what you write in this issue.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: Be specific — what profile, channel type (DM/server), and what you already tried.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Script version (if known)
+      placeholder: "1.4.0"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: topic
+    attributes:
+      label: Topic
+      options:
+        - Installation / userscript manager
+        - Run profile choice (Fast / Careful / Media / Server)
+        - Target IDs (Author / Server / Channel)
+        - Filters or Limits
+        - How long will deletion take / ETA
+        - Rate limits (429) / slowing down
+        - Account token / autofill (no bug — just confused)
+        - API fingerprint Full vs Partial
+        - Server wipe / checkpoint resume
+        - Media backup gallery
+        - Privacy mode / logs
+        - Account ban / ToS risk
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: guide
+    attributes:
+      label: Before asking
+      options:
+        - label: I read the relevant section of USER_GUIDE.md
+          required: false
+        - label: This is not a request to paste or verify my token
+          required: true

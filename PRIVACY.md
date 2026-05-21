@@ -1,6 +1,6 @@
 # Privacy & security
 
-**Undiscord 2: Electric Boogaloo** (v1.4.0) is a client-side userscript. It runs entirely in your browser on `discord.com`. There is no backend, no account system, and no analytics operated by this project.
+**Undiscord 2: Electric Boogaloo** (v1.4.1) is a client-side userscript. It runs entirely in your browser on `discord.com`. There is no backend, no account system, and no analytics operated by this project.
 
 This document explains what the script does with your data so you can decide whether you are comfortable using it.
 

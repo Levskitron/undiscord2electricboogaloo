@@ -2,7 +2,7 @@
 
 **Who this is for:** Anyone who wants to delete their own messages on Discord — no coding experience required. Developers can use the same guide; technical details are in boxes where helpful.
 
-**Version covered:** 1.4.0 · Script: [`undiscord-electric-boogaloo.user.js`](./undiscord-electric-boogaloo.user.js)
+**Version covered:** 1.4.1 · Script: [`undiscord-electric-boogaloo.user.js`](./undiscord-electric-boogaloo.user.js)
 
 > [!CAUTION]
 > **Using this tool can get your Discord account suspended or permanently banned.** It automates your normal user account (what Discord calls a “self-bot”) — not an official bot. That breaks Discord’s rules even when you only delete **your own** messages.
@@ -697,6 +697,13 @@ The bar sits **outside** the scrollable log so it stays the correct width. If **
 - For server wipe, Server ID must not be `@me`.
 - Wait a few seconds for **background auto-fill** (token badge **Ready** under **⚠ Account token**), or open that section, unlock, and click **Fill**.
 - Check the **fingerprint bar**: **Partial** is often enough; if deletes fail with auth errors, scroll the target channel in Discord and try **Delete** again so headers can be captured.
+
+### “Permission denied to access property body” (Firefox + Tampermonkey)
+
+- This is a **userscript manager + browser** quirk: Tampermonkey on Firefox cannot read the response from Discord’s page `fetch`, so search/delete used to fail with that message.
+- **Electric Boogaloo v1.4.1+** automatically switches to **userscript-context fetch** on Firefox + Tampermonkey (you may see one log line about DevTools Network). **Update the script** and reload Discord.
+- **Violentmonkey on Firefox** is still a good alternative if Tampermonkey acts odd.
+- Deletes and headers still go to **discord.com** only — the fix does not change where your token is sent.
 
 ### Errors on other people’s messages (wrong author)
 

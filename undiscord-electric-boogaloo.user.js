@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            Undiscord 2: Electric Boogaloo
 // @description     Bulk-delete your Discord messages: fast wipe, server-wide cleanup, media backup gallery, checkpoints, and reliability fixes.
-// @version         1.4.0
+// @version         1.4.1
 // @author          Levskitron
 // @homepageURL     https://github.com/Levskitron/undiscord2electricboogaloo
 // @supportURL      https://github.com/Levskitron/undiscord2electricboogaloo/issues
@@ -20,7 +20,7 @@
 	'use strict';
 
 	/* rollup-plugin-baked-env */
-	const VERSION = '1.4.0';
+	const VERSION = '1.4.1';
 	const AUTH_CAPTURE_KEY = '__undiscord_eb_auth';
 	const SUPER_PROPERTIES_CAPTURE_KEY = '__undiscord_eb_super_props';
 	let capturedAuthCache = '';
@@ -28,17 +28,39 @@
 
 	/** Real page window (Violentmonkey/Tampermonkey sandbox vs Discord tab) */
 	const pageWindow = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
-	/** Page fetch so discord.com/api calls show in DevTools Network (VM/TM sandbox fetch often does not). */
+	const userscriptManager = typeof GM_info !== 'undefined' && GM_info.scriptHandler
+	  ? GM_info.scriptHandler
+	  : (typeof GM !== 'undefined' && GM.info?.scriptHandler) || 'userscript';
+	/** Userscript-sandbox fetch — Response body is always readable here. */
+	const sandboxFetch = (() => {
+	  if (typeof fetch === 'function') return fetch.bind(globalThis);
+	  return fetch;
+	})();
+	/** Page fetch (DevTools Network visibility) — may return unreadable Response in Firefox + Tampermonkey. */
 	const pageFetch = (() => {
 	  try {
 	    const fn = pageWindow.fetch;
 	    if (typeof fn === 'function') return fn.bind(pageWindow);
 	  } catch {}
-	  return typeof fetch === 'function' ? fetch.bind(pageWindow) : fetch;
+	  return sandboxFetch;
 	})();
-	const userscriptManager = typeof GM_info !== 'undefined' && GM_info.scriptHandler
-	  ? GM_info.scriptHandler
-	  : (typeof GM !== 'undefined' && GM.info?.scriptHandler) || 'userscript';
+	/** Firefox + Tampermonkey cannot read page-context Response.body (Xray / cross-world). */
+	const preferSandboxApiFetch = userscriptManager === 'Tampermonkey'
+	  && /firefox/i.test(navigator.userAgent);
+	let apiFetchImpl = preferSandboxApiFetch ? sandboxFetch : pageFetch;
+	let apiFetchModeResolved = preferSandboxApiFetch;
+	let apiFetchCrossContextWarned = false;
+
+	/** True when a page-context Response throws on .body (Tampermonkey + Firefox). */
+	function isUnreadablePageResponse(resp) {
+	  if (!resp || typeof resp !== 'object') return false;
+	  try {
+	    void resp.body;
+	    return false;
+	  } catch (err) {
+	    return /permission denied/i.test(String(err?.message || err));
+	  }
+	}
 	const CHECKPOINT_KEY = 'undiscord_eb_checkpoint_v1';
 	const LOG_MAINTENANCE_INTERVAL_MS = 3600000;
 	const TOOL_NAME = 'Undiscord 2: Electric Boogaloo';
@@ -4236,16 +4258,35 @@ window.postMessage({source:'undiscord',type:'superProperties',id:'${reqId}',valu
 	}
 
 	/** fetch() to discord.com/api with browser-like headers (manager-agnostic). */
-	function discordApiFetch(url, authToken, init = {}, headerOpts = {}) {
+	async function discordApiFetch(url, authToken, init = {}, headerOpts = {}) {
 	  const base = buildDiscordApiHeaders(authToken, headerOpts);
 	  const extra = init.headers && typeof init.headers === 'object' ? init.headers : {};
 	  const headers = { ...base, ...extra };
-	  logDiscordApiRequestDebug(url, init.method || 'GET', headers);
-	  return pageFetch(url, {
+	  const opts = {
 	    ...init,
 	    credentials: init.credentials ?? 'include',
 	    headers,
-	  });
+	  };
+	  logDiscordApiRequestDebug(url, init.method || 'GET', headers);
+
+	  let resp = await apiFetchImpl(url, opts);
+	  if (isUnreadablePageResponse(resp)) {
+	    if (apiFetchImpl !== sandboxFetch) {
+	      if (!apiFetchCrossContextWarned) {
+	        apiFetchCrossContextWarned = true;
+	        log.warn(
+	          `${userscriptManager} on Firefox cannot read page-context API responses — `
+	          + 'using userscript fetch instead. Deletes/search still work; requests may not appear in DevTools Network.',
+	        );
+	      }
+	      apiFetchImpl = sandboxFetch;
+	      apiFetchModeResolved = true;
+	      resp = await sandboxFetch(url, opts);
+	    }
+	  } else if (!apiFetchModeResolved && apiFetchImpl === pageFetch) {
+	    apiFetchModeResolved = true;
+	  }
+	  return resp;
 	}
 
 	function acquireWebpackRequire(globalObj) {

@@ -53,4 +53,4 @@ body:
     attributes:
       label: Version
       options:
-        - label: I checked this against the current main branch (v1.4.0 era)
+        - label: I checked this against the current main branch (v1.4.1 era)

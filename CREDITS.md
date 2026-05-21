@@ -15,7 +15,7 @@ Per MIT, derivatives must keep attribution to victornpb/undiscord in code, READM
 
 **No — not word-for-word.**
 
-Electric Boogaloo is **this repository’s own codebase** (single userscript file, 5,000+ lines as of v1.4.0). It is not a merge of, nor a byte-for-byte copy of, SuicidaI-Idol, AerialJustice, TheCellMaster, or GreasyFork re-uploads.
+Electric Boogaloo is **this repository’s own codebase** (single userscript file, 5,000+ lines as of v1.4.1). It is not a merge of, nor a byte-for-byte copy of, SuicidaI-Idol, AerialJustice, TheCellMaster, or GreasyFork re-uploads.
 
 What we did instead:
 
@@ -50,7 +50,8 @@ Examples of work that is **Electric Boogaloo–specific** (design/integration, n
 - Optional **Unarchive threads before delete** (toggle; behavior implemented here)  
 - **Client-like API headers** (v1.4.0) — `discordApiFetch`, Full/Partial fingerprint bar, page traffic capture, synthetic `X-Super-Properties`, optional **Debug API headers** log toggle  
 - **Account token vault** (v1.4.0) — dedicated sidebar danger section, acknowledgment gate, background autofill, gated Copy, masked token field  
-- **Main panel layout** (v1.4.0) — fingerprint bar outside scrollable log, resizable window (default 1100px), segmented footer progress
+- **Main panel layout** (v1.4.0) — fingerprint bar outside scrollable log, resizable window (default 1100px), segmented footer progress  
+- **Firefox + Tampermonkey API fetch** (v1.4.1) — sandbox `fetch` when page-context `Response.body` is unreadable; Violentmonkey unchanged
 
 ## Third-party assets
 

@@ -26,7 +26,7 @@ body:
     id: version
     attributes:
       label: Script version (if known)
-      placeholder: "1.4.0"
+      placeholder: "1.4.1"
     validations:
       required: false
 

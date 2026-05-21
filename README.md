@@ -1,6 +1,6 @@
 # Undiscord 2: Electric Boogaloo
 
-**Version:** 1.4.0 · **Script:** [`undiscord-electric-boogaloo.user.js`](./undiscord-electric-boogaloo.user.js)
+**Version:** 1.4.1 · **Script:** [`undiscord-electric-boogaloo.user.js`](./undiscord-electric-boogaloo.user.js)
 
 > [!CAUTION]
 > **Using this script can get your Discord account terminated.** It automates **your normal user account** (a “self-bot”) via Discord’s HTTP API. That is **not** the supported bot/OAuth2 developer flow Discord allows.

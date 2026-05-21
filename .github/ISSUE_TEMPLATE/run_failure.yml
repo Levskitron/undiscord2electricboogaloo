@@ -16,8 +16,8 @@ body:
     id: version
     attributes:
       label: Script version
-      description: Shown in the sidebar footer (e.g. 1.4.0) or in the userscript header.
-      placeholder: "1.4.0"
+      description: Shown in the sidebar footer (e.g. 1.4.1) or in the userscript header.
+      placeholder: "1.4.1"
     validations:
       required: true
 

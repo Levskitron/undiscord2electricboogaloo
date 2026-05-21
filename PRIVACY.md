@@ -22,7 +22,10 @@ This document explains what the script does with your data so you can decide whe
 
 ## How it works (data flow)
 
-1. **You** open Discord in the browser and run the userscript via Tampermonkey, Violentmonkey, or similar.
+> [!NOTE]
+> **Userscript managers:** The script targets Tampermonkey, Violentmonkey, Greasemonkey, and similar extensions. **Violentmonkey is the primary development and testing environment**; other managers are supported and receive release testing (see [README](./README.md#requirements)).
+
+1. **You** open Discord in the browser and run the userscript via Violentmonkey, Tampermonkey, Greasemonkey, or similar.
 2. The script builds a UI overlay. Settings you enter (IDs, filters, delays) stay in page memory for that session; some data may persist in **browser `localStorage`** (see below).
 3. To delete messages, the script calls Discord’s API (`https://discord.com/api/v9/...`) with a **Bearer token** — the same authorization model the Discord web app uses.
 4. Search and delete use the browser’s `fetch()`. Responses are handled in your tab and shown in the in-panel log.

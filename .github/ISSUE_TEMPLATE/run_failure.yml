@@ -12,6 +12,8 @@ body:
 
         Before submitting, check **[USER_GUIDE — When something goes wrong](https://github.com/Levskitron/undiscord2electricboogaloo/blob/main/USER_GUIDE.md#when-something-goes-wrong)**.
 
+        **Note:** Primary development uses **Violentmonkey**; Tampermonkey and Greasemonkey are tested too. Please name your manager and browser below — issues are often manager-specific.
+
   - type: input
     id: version
     attributes:

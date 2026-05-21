@@ -156,11 +156,14 @@ There is no responsible way to promise “done tonight” for huge archives. If 
 | A **userscript manager** (add-on for the browser) | This runs the script for you |
 | Your Discord account logged in | The tool uses your login like the website does |
 
-**Recommended userscript managers:**
+**Supported userscript managers:**
 
-- [Tampermonkey](https://www.tampermonkey.net/) (Chrome, Edge, Firefox, etc.)
-- [Violentmonkey](https://violentmonkey.github.io/) (Firefox-friendly; recommended if Tampermonkey acts odd)
-- [Greasemonkey](https://www.greasespot.net/) (Firefox)
+- [Violentmonkey](https://violentmonkey.github.io/) — **primary development target**; best first choice if you are unsure
+- [Tampermonkey](https://www.tampermonkey.net/) (Chrome, Edge, Firefox, etc.) — supported; tested on releases
+- [Greasemonkey](https://www.greasespot.net/) (Firefox) — supported; tested on releases
+
+> [!NOTE]
+> **Which manager should I use?** Electric Boogaloo is designed to work across the managers above (and similar ones). **Most day-to-day development and testing happen on Violentmonkey**, so you are least likely to hit manager-specific bugs there. **Tampermonkey** and **Greasemonkey** are still tested before releases — for example, Firefox + Tampermonkey has extra fetch handling so search/delete keep working. If one manager acts strange, try **Violentmonkey** on the same browser before assuming the script is broken.
 
 When the manager asks for permissions, allow **GM_download** (save logs/media to folders), **unsafeWindow**, and **GM_addElement** if offered — the last two help token autofill and client-style API headers in your Discord tab. After an update, re-open the script’s permission screen if **Fill** or delete fails with auth errors.
 
@@ -171,10 +174,10 @@ When the manager asks for permissions, allow **GM_download** (save logs/media to
 
 ## Install the tool
 
-### Step 1 — Install Tampermonkey (or similar)
+### Step 1 — Install a userscript manager
 
 1. Open your browser’s extension store.
-2. Search for **Tampermonkey** (or Violentmonkey).
+2. Search for **Violentmonkey** (recommended), **Tampermonkey**, or **Greasemonkey** (Firefox).
 3. Click **Add to browser** / **Install**.
 4. Finish any setup screens.
 
@@ -185,11 +188,11 @@ When the manager asks for permissions, allow **GM_download** (save logs/media to
 
 1. Open this link (or ask a trusted adult to open it):  
    [undiscord-electric-boogaloo.user.js](https://github.com/Levskitron/undiscord2electricboogaloo/raw/main/undiscord-electric-boogaloo.user.js)
-2. Tampermonkey should show an **Install** screen.
+2. Your manager should show an **Install** screen.
 3. Click **Install**.
 4. If asked about permissions, allow **GM_download** (backups and logs), **unsafeWindow**, and **GM_addElement** when offered (token autofill and client-like API headers).
 
-**Manual install:** Copy the file from this folder into a new script in Tampermonkey and save.
+**Manual install:** Copy the file from this folder into a new script in your manager and save.
 
 ### Step 3 — Check it works
 
@@ -702,7 +705,7 @@ The bar sits **outside** the scrollable log so it stays the correct width. If **
 
 - This is a **userscript manager + browser** quirk: Tampermonkey on Firefox cannot read the response from Discord’s page `fetch`, so search/delete used to fail with that message.
 - **Electric Boogaloo v1.4.1+** automatically switches to **userscript-context fetch** on Firefox + Tampermonkey (you may see one log line about DevTools Network). **Update the script** and reload Discord.
-- **Violentmonkey on Firefox** is still a good alternative if Tampermonkey acts odd.
+- **Violentmonkey on Firefox** is the primary tested stack and often avoids this class of issue entirely; Tampermonkey should still work after the automatic fallback above.
 - Deletes and headers still go to **discord.com** only — the fix does not change where your token is sent.
 
 ### Errors on other people’s messages (wrong author)
@@ -795,6 +798,9 @@ Not if **Author ID** is correct — it targets **your** messages only.
 
 **Can I use it on my phone?**  
 Only if you use a **mobile browser** with a userscript manager that supports Discord’s website. The Discord phone app alone does not run this script.
+
+**Tampermonkey or Violentmonkey?**  
+Both work. **Violentmonkey** is where most development and daily testing happen, so it is the safest default if you want the fewest manager-specific surprises. **Tampermonkey** and **Greasemonkey** are still tested on releases. On **Firefox + Tampermonkey**, the script automatically uses a compatible fetch path if the manager cannot read page responses (see [troubleshooting](#permission-denied-to-access-property-body-firefox--tampermonkey)).
 
 **How long will 100,000 messages take?**  
 

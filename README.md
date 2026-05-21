@@ -37,6 +37,9 @@ What you delete and which filters you use is **your business**. This project is 
 - A **userscript manager**, e.g. [Tampermonkey](https://www.tampermonkey.net/), [Violentmonkey](https://violentmonkey.github.io/), or [Greasemonkey](https://www.greasespot.net/) (Firefox)
 - Grants used: **`GM_download`** (log/media saves), **`unsafeWindow`** and **`GM_addElement`** (token autofill and client-like API headers). Without `GM_download`, saves fall back to normal browser downloads.
 
+> [!NOTE]
+> **Userscript managers:** This script is intended to work across common managers (Tampermonkey, Violentmonkey, Greasemonkey, and similar). **Primary development and day-to-day testing use [Violentmonkey](https://violentmonkey.github.io/)**, so that is the combination most likely to stay fully compatible and run into fewer manager-specific quirks. Releases are still tested on **Tampermonkey** and **Greasemonkey** as well — including Firefox + Tampermonkey workarounds where needed. If something behaves oddly on another manager, try Violentmonkey and [open an issue](https://github.com/Levskitron/undiscord2electricboogaloo/issues) with your manager name and browser.
+
 ## Installation
 
 > [!WARNING]

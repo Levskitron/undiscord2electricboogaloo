@@ -159,9 +159,10 @@ There is no responsible way to promise “done tonight” for huge archives. If 
 **Recommended userscript managers:**
 
 - [Tampermonkey](https://www.tampermonkey.net/) (Chrome, Edge, Firefox, etc.)
-- [Violentmonkey](https://violentmonkey.github.io/)
+- [Violentmonkey](https://violentmonkey.github.io/) (Firefox-friendly; recommended if Tampermonkey acts odd)
+- [Greasemonkey](https://www.greasespot.net/) (Firefox)
 
-When the manager asks about **GM_download**, say **yes** if you want organized folders for saved photos and log files on your computer.
+When the manager asks for permissions, allow **GM_download** (save logs/media to folders), **unsafeWindow**, and **GM_addElement** if offered — the last two help token autofill and client-style API headers in your Discord tab. After an update, re-open the script’s permission screen if **Fill** or delete fails with auth errors.
 
 > [!IMPORTANT]
 > **GM_download** is only used to save log and media files **onto your computer**. It is not used to upload your messages or token to this GitHub project or other third parties. Core delete/search still talks to **discord.com** only.
@@ -234,7 +235,8 @@ Fold-out sections you can open and close:
 | **Limits** | Only delete messages before/after a date or message ID |
 | **Bulk archive** | Import channel list from a Discord data export file |
 | **Session & logs** | Save log files, resume server wipe, count messages first |
-| **Advanced** | Speed, delays, token, expert options |
+| **Advanced** | Speed, delays, expert options |
+| **⚠ Account token** | Last item on the sidebar — login token danger zone (below Advanced) |
 
 ### Bottom (actions and log)
 
@@ -583,6 +585,26 @@ See Discord’s guide: [Requesting all of your data](https://support.discord.com
 
 ---
 
+### ⚠ Account token (own menu — bottom of sidebar)
+
+This is its **own** red section — the **last** item in the sidebar, directly **under Advanced** (not inside it). It is **closed by default**.
+
+| What you see | Meaning |
+|--------------|---------|
+| **Ready / Not set** badge on the header | Whether a token is loaded — **never shows the token itself** |
+| **Auto-fill token in the background** (on by default) | Tries to detect your token automatically — you usually **never need to open** this section |
+| Opening the section | Warning screen + checkbox — you must acknowledge risk before **Show token field** |
+| **Fill / Clear** | Only after unlock — force detection or wipe the field (does not log you out of Discord) |
+| **Copy** | Hidden until you tick **“I know what I am doing — show Copy”**; then **Copy token** appears. A confirmation dialog warns you again. The field **stays dotted** — only the clipboard gets the real value. |
+
+> [!CAUTION]
+> **Your token is full account access** — more sensitive than your password in practice. Anyone with it can act as you until Discord resets it. **Privacy mode masks other fields and log lines but does not remove the token from memory** while this section is unlocked. Never screenshot, stream, or paste the token into chats or random sites. **Clear** when done on a shared PC.
+
+> [!TIP]
+> For most runs, leave the section closed, keep **Auto-fill** on, and click **▶ Delete**. The tool fills the token quietly and retries on **Delete** if needed.
+
+---
+
 ### Advanced
 
 | Setting | Simple explanation |
@@ -592,10 +614,6 @@ See Discord’s guide: [Requesting all of your data](https://support.discord.com
 | **Empty page retries** | How many times to retry when search says “nothing found” but you expect more (default 2). |
 | **Confirm before first delete batch** | One “Are you sure?” popup with preview. |
 | **Unarchive threads before delete** | Try to unarchive old threads so messages inside can be deleted. |
-| **Token → Fill** | Lets the tool read your login token from Discord (like the website uses). Only needed if delete fails with auth errors. |
-
-> [!CAUTION]
-> **Your token is full account access.** Anyone with it can act as you on Discord until it is reset. Never paste it into websites, DMs, or screenshots. Use **Privacy mode** if someone can see your screen. **Fill** only reads the token for **discord.com** — a malicious script could send it elsewhere; that is why trusted install matters.
 
 ---
 
@@ -658,7 +676,7 @@ See Discord’s guide: [Requesting all of your data](https://support.discord.com
 
 - Check Author ID, Server ID, and Channel ID.
 - For server wipe, Server ID must not be `@me`.
-- Open **Advanced → Token → Fill** if you see authorization errors in the log.
+- Wait a few seconds for **background auto-fill** (badge should say **Ready**), or open **⚠ Account token** at the bottom of the sidebar, unlock, and click **Fill**.
 
 ### Errors on other people’s messages (wrong author)
 
@@ -726,6 +744,7 @@ Full details: **[PRIVACY.md](./PRIVACY.md)**
 - This **sidebar UI**, privacy mode, session logs, checkpoints  
 - **Server wipe** with pre-count + resume  
 - **Author ID** safeguards and this **USER_GUIDE** / **PRIVACY** docs  
+- **Client-like API headers** (v1.4+) so deletes look like the web app, not bare token-only requests  
 
 Full detail and links: **[CREDITS.md](./CREDITS.md)**.
 

@@ -1,6 +1,6 @@
 # Undiscord 2: Electric Boogaloo
 
-**Version:** 1.3.1 · **Script:** [`undiscord-electric-boogaloo.user.js`](./undiscord-electric-boogaloo.user.js)
+**Version:** 1.4.0 · **Script:** [`undiscord-electric-boogaloo.user.js`](./undiscord-electric-boogaloo.user.js)
 
 > [!CAUTION]
 > **Using this script can get your Discord account terminated.** It automates **your normal user account** (a “self-bot”) via Discord’s HTTP API. That is **not** the supported bot/OAuth2 developer flow Discord allows.
@@ -86,6 +86,7 @@ Profiles set sensible defaults. Changing any control manually switches the profi
 ### Deletion & search
 
 - Bulk delete **your** messages in a channel, DM, comma-separated channel list, or **entire server** (all message channels).
+- **Client-like API headers** on every `discord.com/api` call (`X-Super-Properties`, locale, timezone, channel `Referer`) — same idea as the web app, not “Authorization-only” deletes. Works with **Tampermonkey**, **Violentmonkey**, **Greasemonkey**, and other managers that grant `unsafeWindow` / `GM_addElement`.
 - Discord **search API** with guild/channel scope fallbacks and optional **channel history scan** when search is unavailable (`50024`).
 - **Hybrid time-remaining** estimate (modeled delays + observed throughput + rate-limit history).
 - **Rate-limit aware** — raises delays on HTTP 429; retries empty search pages; network retry on 5xx / transient failures.
@@ -121,6 +122,7 @@ Profiles set sensible defaults. Changing any control manually switches the profi
 - **Auto-clear log hourly** without saving.
 - **Copy log** to clipboard; **Clear log**; **Verbose log** and **Log each deletion** (footer toggles).
 - **Privacy mode** — masks IDs/token in the form and redacts log content (toggle anytime).
+- **Account token vault** — red, collapsed danger section with acknowledgment gate; **background auto-fill** (default on) so most users never open it.
 - **Auto-fill IDs when I change channel** (default on).
 - Sidebar sections: Run profile, Target, Filters, Media review, Limits, Bulk archive, Session & logs, Advanced.
 - Toolbar trash button with resilient mount; floating fallback if Discord re-renders the header.
@@ -138,7 +140,7 @@ Profiles set sensible defaults. Changing any control manually switches the profi
 | Empty page retries (0–10) | Retry when Discord returns empty pages before stopping (default 2) |
 | Confirm before first delete batch | One-time `confirm()` with preview (Careful / Server profiles) |
 | Unarchive threads before delete | On archived-thread errors, PATCH unarchive and retry (off by default) |
-| Token → **Fill** | Auto-detect: `localStorage` → webpack → page-context script |
+| **Account token** (sidebar, below Advanced) | Red vault; background auto-fill; gated **Copy** (checkbox + confirm; field stays masked) |
 
 ## Configuration reference (sidebar)
 
@@ -151,7 +153,8 @@ Profiles set sensible defaults. Changing any control manually switches the profi
 | **Limits** | Min/max message ID (pick from chat), date range |
 | **Bulk archive** | Import `index.json` from Discord export |
 | **Session & logs** | Hourly log save/clear, save on stop, pre-count, checkpoint |
-| **Advanced** | Delays, empty-page retries, confirm, unarchive, manual token |
+| **Advanced** | Delays, empty-page retries, confirm, unarchive |
+| **Account token** | Own sidebar section (last item, below Advanced); gated vault, auto-fill, optional Copy |
 
 ### Toolbar & footer
 
@@ -216,7 +219,7 @@ Profiles set sensible defaults. Changing any control manually switches the profi
 | Media | Delete only | Optional interactive backup gallery |
 | Profiles | One behavior | Fast / Careful / Media / Server / Custom |
 | ETA | Basic | Hybrid model + observed throughput |
-| Token | Single method | Chained autofill fallbacks |
+| Token / API fingerprint | Single method | Chained autofill + client-like request headers |
 
 This repository is **not** affiliated with Discord Inc. or the original Undiscord maintainers.
 

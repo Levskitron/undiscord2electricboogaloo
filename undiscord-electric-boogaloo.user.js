@@ -1,15 +1,18 @@
 // ==UserScript==
 // @name            Undiscord 2: Electric Boogaloo
 // @description     Bulk-delete your Discord messages: fast wipe, server-wide cleanup, media backup gallery, checkpoints, and reliability fixes.
-// @version         1.3.3
+// @version         1.4.0
 // @author          Levskitron
 // @homepageURL     https://github.com/Levskitron/undiscord2electricboogaloo
 // @supportURL      https://github.com/Levskitron/undiscord2electricboogaloo/issues
 // @match           https://*.discord.com/*
+// @run-at          document-start
+// @inject-into     content
 // @license         MIT
 // @namespace       https://github.com/Levskitron/undiscord2electricboogaloo
 // @icon            https://victornpb.github.io/undiscord/images/icon128.png
 // @grant           GM_download
+// @grant           GM_addElement
 // @grant           unsafeWindow
 // @attribution     Original project (https://github.com/victornpb/undiscord)
 // ==/UserScript==
@@ -17,14 +20,30 @@
 	'use strict';
 
 	/* rollup-plugin-baked-env */
-	const VERSION = '1.3.3';
+	const VERSION = '1.4.0';
+	const AUTH_CAPTURE_KEY = '__undiscord_eb_auth';
+	const SUPER_PROPERTIES_CAPTURE_KEY = '__undiscord_eb_super_props';
+	let capturedAuthCache = '';
+	let capturedSuperPropertiesCache = '';
 
-	/** Real page window (Tampermonkey isolated world vs Discord page) */
+	/** Real page window (Violentmonkey/Tampermonkey sandbox vs Discord tab) */
 	const pageWindow = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
+	/** Page fetch so discord.com/api calls show in DevTools Network (VM/TM sandbox fetch often does not). */
+	const pageFetch = (() => {
+	  try {
+	    const fn = pageWindow.fetch;
+	    if (typeof fn === 'function') return fn.bind(pageWindow);
+	  } catch {}
+	  return typeof fetch === 'function' ? fetch.bind(pageWindow) : fetch;
+	})();
+	const userscriptManager = typeof GM_info !== 'undefined' && GM_info.scriptHandler
+	  ? GM_info.scriptHandler
+	  : (typeof GM !== 'undefined' && GM.info?.scriptHandler) || 'userscript';
 	const CHECKPOINT_KEY = 'undiscord_eb_checkpoint_v1';
 	const LOG_MAINTENANCE_INTERVAL_MS = 3600000;
 	const TOOL_NAME = 'Undiscord 2: Electric Boogaloo';
-	const WINDOW_WIDTH = 960;
+	const WINDOW_WIDTH = 1100;
+	const WINDOW_MIN_WIDTH = 880;
 
 	var themeCss = (`
 /* Core layout canvas window adjustments */
@@ -154,6 +173,157 @@
     gap: 18px !important;
     border-top: 1px solid #3f4147 !important;
     overflow: visible !important;
+}
+
+/* Token vault — isolated, high-visibility danger zone */
+#undiscord .sidebar-section-danger {
+    border-color: #ed4245 !important;
+    box-shadow: 0 0 0 1px rgba(237, 66, 69, 0.25) !important;
+}
+
+#undiscord .sidebar-section-danger > summary.token-vault-summary {
+    background: linear-gradient(90deg, rgba(237, 66, 69, 0.22), rgba(237, 66, 69, 0.05)) !important;
+    color: #fee75c !important;
+    border-radius: 7px 7px 0 0 !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 6px 10px !important;
+}
+
+#undiscord .sidebar-section-danger:not([open]) > summary.token-vault-summary {
+    border-radius: 7px !important;
+}
+
+#undiscord .sidebar-section-danger > summary.token-vault-summary:hover {
+    background: linear-gradient(90deg, rgba(237, 66, 69, 0.35), rgba(237, 66, 69, 0.12)) !important;
+    color: #fff !important;
+}
+
+#undiscord .token-vault-label {
+    font-weight: 800 !important;
+    letter-spacing: 0.04em !important;
+}
+
+#undiscord .token-vault-sub {
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    color: #ed4245 !important;
+    letter-spacing: 0.08em !important;
+    flex: 1 1 auto !important;
+}
+
+#undiscord .token-status-badge {
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.06em !important;
+    padding: 3px 8px !important;
+    border-radius: 999px !important;
+    margin-left: auto !important;
+}
+
+#undiscord .token-status-unknown {
+    background: #4e5058 !important;
+    color: #b5bac1 !important;
+}
+
+#undiscord .token-status-ready {
+    background: rgba(67, 181, 129, 0.25) !important;
+    color: #43b581 !important;
+}
+
+#undiscord .token-status-missing {
+    background: rgba(250, 166, 26, 0.2) !important;
+    color: #faa61a !important;
+}
+
+#undiscord .token-vault-body {
+    border-top-color: #ed4245 !important;
+    background: #1a1b1e !important;
+}
+
+#undiscord .token-vault-gate {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    padding: 12px !important;
+    border: 2px solid #ed4245 !important;
+    border-radius: 8px !important;
+    background: rgba(237, 66, 69, 0.08) !important;
+}
+
+#undiscord .token-vault-warn-title {
+    margin: 0 !important;
+    font-size: 14px !important;
+    font-weight: 800 !important;
+    color: #f04747 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.04em !important;
+}
+
+#undiscord .token-vault-warn-list {
+    margin: 0 !important;
+    padding-left: 1.2em !important;
+    font-size: 12px !important;
+    line-height: 1.5 !important;
+    color: #f2f3f5 !important;
+}
+
+#undiscord .token-vault-warn-list li {
+    margin-bottom: 6px !important;
+}
+
+#undiscord .token-vault-ack {
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    color: #fee75c !important;
+    cursor: pointer !important;
+}
+
+#undiscord .token-vault-ack input {
+    margin-top: 3px !important;
+    accent-color: #ed4245 !important;
+}
+
+#undiscord .token-vault-inner[hidden],
+#undiscord .token-vault-gate[hidden] {
+    display: none !important;
+}
+
+#undiscord #tokenVaultUnlock {
+    width: 100% !important;
+    background-color: #ed4245 !important;
+    color: #fff !important;
+    font-weight: 700 !important;
+}
+
+#undiscord #tokenVaultUnlock:disabled {
+    opacity: 0.45 !important;
+    cursor: not-allowed !important;
+}
+
+#undiscord .token-vault-inner .field-btn-danger {
+    background-color: #ed4245 !important;
+}
+
+#undiscord .token-vault-inner .field-btn-danger:hover {
+    background-color: #c03537 !important;
+}
+
+#undiscord input#token {
+    font-family: monospace !important;
+    letter-spacing: 0.02em !important;
+    -webkit-text-security: disc !important;
+    text-security: disc !important;
+}
+
+#undiscord #tokenCopyRow[hidden] {
+    display: none !important;
 }
 
 #undiscord .field {
@@ -364,6 +534,7 @@
 
 /* Custom styled layout text boxes */
 #undiscord input[type="text"],
+#undiscord input[type="password"],
 #undiscord input[type="number"],
 #undiscord input[type="datetime-local"],
 #undiscord input[type="file"],
@@ -445,9 +616,10 @@
     color: #dbdee1 !important;
     padding: 12px !important;
     font-family: monospace !important;
-    flex-grow: 1 !important;
+    flex: 1 1 0 !important;
     min-width: 0 !important;
     min-height: 0 !important;
+    width: 100% !important;
     margin: 0 !important;
     border-radius: 0 !important;
     white-space: pre-wrap !important;
@@ -455,6 +627,123 @@
     word-break: break-word !important;
     overflow-x: hidden !important;
     overflow-y: auto !important;
+}
+
+#undiscord #logArea > * {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+#undiscord .fingerprint-status-slot {
+    flex: 0 0 auto !important;
+    flex-shrink: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    padding: 10px 12px 10px 12px !important;
+    box-sizing: border-box !important;
+}
+
+#undiscord #fingerprintStatusBar {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+    flex-shrink: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    padding: 12px 14px !important;
+    border-radius: 8px !important;
+    border: 2px solid #4e5058 !important;
+    background: #232428 !important;
+    font-family: "gg sans", "Noto Sans", "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+    font-size: 13px !important;
+    line-height: 1.4 !important;
+    color: #dbdee1 !important;
+    text-align: left !important;
+    white-space: normal !important;
+    word-break: normal !important;
+    overflow: hidden !important;
+}
+
+#undiscord #fingerprintStatusBar .fingerprint-status-pill {
+    flex: 0 0 auto !important;
+    min-width: 72px !important;
+    padding: 4px 10px !important;
+    border-radius: 999px !important;
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.06em !important;
+    text-transform: uppercase !important;
+    text-align: center !important;
+    line-height: 1.3 !important;
+    margin-top: 2px !important;
+}
+
+#undiscord #fingerprintStatusBar.fingerprint-full .fingerprint-status-pill {
+    background: rgba(67, 181, 129, 0.28) !important;
+    color: #43b581 !important;
+}
+
+#undiscord #fingerprintStatusBar.fingerprint-partial .fingerprint-status-pill {
+    background: rgba(250, 166, 26, 0.28) !important;
+    color: #faa61a !important;
+}
+
+#undiscord #fingerprintStatusBar.fingerprint-unknown .fingerprint-status-pill {
+    background: #4e5058 !important;
+    color: #b5bac1 !important;
+}
+
+#undiscord #fingerprintStatusBar .fingerprint-status-copy {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+    align-items: flex-start !important;
+    text-align: left !important;
+}
+
+#undiscord #fingerprintStatusBar .fingerprint-status-title {
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    color: #f2f3f5 !important;
+    line-height: 1.3 !important;
+    max-width: 100% !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+}
+
+#undiscord #fingerprintStatusBar .fingerprint-status-detail {
+    font-size: 12px !important;
+    font-weight: 400 !important;
+    color: #b5bac1 !important;
+    line-height: 1.45 !important;
+    max-width: 100% !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+}
+
+#undiscord #fingerprintStatusBar.fingerprint-full {
+    border-color: #43b581 !important;
+    background: rgba(67, 181, 129, 0.1) !important;
+}
+
+#undiscord #fingerprintStatusBar.fingerprint-partial {
+    border-color: #faa61a !important;
+    background: rgba(250, 166, 26, 0.08) !important;
+}
+
+#undiscord #fingerprintStatusBar.fingerprint-unknown {
+    border-color: #4e5058 !important;
+}
+
+#undiscord #fingerprintStatusBar.fingerprint-unknown .fingerprint-status-title,
+#undiscord #fingerprintStatusBar.fingerprint-unknown .fingerprint-status-detail {
+    color: #949ba4 !important;
 }
 
 #undiscord #logArea .log {
@@ -466,11 +755,112 @@
     margin-bottom: 4px !important;
 }
 
-#undiscord .footer {
+#undiscord .main > .main-footer {
+    display: flex !important;
+    flex-direction: column !important;
+    flex-wrap: nowrap !important;
+    align-items: stretch !important;
+    gap: 6px !important;
     background-color: #2b2d31 !important;
     border-top: 1px solid #1e1f22 !important;
-    padding: 8px 12px !important;
-    flex-shrink: 0;
+    padding: 6px 30px 8px 12px !important;
+    flex: 0 0 auto !important;
+    flex-shrink: 0 !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    cursor: se-resize;
+    box-sizing: border-box !important;
+}
+
+#undiscord .main > .main-footer .progress-stats {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 0 !important;
+    overflow: visible !important;
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+}
+
+#undiscord .main > .main-footer .progress-seg {
+    display: inline-flex !important;
+    align-items: baseline !important;
+    gap: 5px !important;
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+}
+
+#undiscord .main > .main-footer .progress-seg.progress-count {
+    flex-shrink: 1 !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    color: #dbdee1 !important;
+    font-weight: 600 !important;
+}
+
+#undiscord .main > .main-footer .progress-value {
+    color: #949ba4 !important;
+    font-weight: 500 !important;
+}
+
+#undiscord .main > .main-footer .progress-label {
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.05em !important;
+    text-transform: uppercase !important;
+    color: #949ba4 !important;
+}
+
+#undiscord .main > .main-footer .progress-time {
+    font-family: Consolas, Liberation Mono, Menlo, Courier, monospace !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    color: #dbdee1 !important;
+}
+
+#undiscord .main > .main-footer .progress-seg.progress-elapsed .progress-time {
+    color: #b5bac1 !important;
+}
+
+#undiscord .main > .main-footer .progress-seg.progress-remaining .progress-time {
+    color: #faa61a !important;
+}
+
+#undiscord .main > .main-footer .progress-sep {
+    flex: 0 0 1px !important;
+    width: 1px !important;
+    height: 20px !important;
+    margin: 0 10px !important;
+    background: #4e5058 !important;
+    align-self: center !important;
+}
+
+#undiscord .main > .main-footer .main-footer-options {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 10px !important;
+    margin-left: 0 !important;
+}
+
+#undiscord .main > .main-footer .main-footer-options label {
+    display: inline-flex !important;
+    align-items: center !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    gap: 5px !important;
+    margin: 0 !important;
+    font-size: 11px !important;
+    color: #b5bac1 !important;
 }
 
 #undiscord .info {
@@ -669,19 +1059,21 @@
 #undicord-btn.running { color: var(--control-critical-primary-background-default, var(--button-danger-background)) !important; }
 #undicord-btn.running progress { display: block; }
 /**** Undiscord Interface ****/
-#undiscord { position: fixed; z-index: 100; display: flex; flex-direction: column; width: 960px; min-width: 960px; max-width: 96vw; height: 80vh; min-height: 448px; max-height: 100vh; color: var(--text-default, var(--text-normal)); border-radius: 4px; background-color: var(--background-surface-high, var(--background-secondary)); box-shadow: var(--elevation-stroke), var(--elevation-high); will-change: top, left, height; }
+#undiscord { position: fixed; z-index: 100; display: flex; flex-direction: column; width: ${WINDOW_WIDTH}px; min-width: ${WINDOW_MIN_WIDTH}px; max-width: 96vw; height: 80vh; min-height: 448px; max-height: 100vh; color: var(--text-default, var(--text-normal)); border-radius: 4px; background-color: var(--background-surface-high, var(--background-secondary)); box-shadow: var(--elevation-stroke), var(--elevation-high); will-change: top, left, width, height; }
 #undiscord .header .icon { cursor: pointer; }
 #undiscord .window-body { height: calc(100% - 48px); min-height: 0; }
-#undiscord .main { display: flex; flex: 1; min-width: 0; min-height: 0; background-color: var(--bg-overlay-chat, var(--background-base-lower)); }
+#undiscord .main { display: flex !important; flex-direction: column !important; flex: 1 1 0 !important; min-width: 0 !important; min-height: 0 !important; width: 100% !important; background-color: var(--bg-overlay-chat, var(--background-base-lower)); }
+#undiscord #logArea { flex: 1 1 0 !important; min-height: 0 !important; width: 100% !important; }
 #undiscord.hide-sidebar .sidebar { display: none !important; }
 #undiscord.hide-sidebar .main { max-width: 100%; width: 100%; }
-#undiscord #logArea { font-family: Consolas, Liberation Mono, Menlo, Courier, monospace; font-size: 0.75rem; padding: 10px; user-select: text; flex-grow: 1; min-width: 0; min-height: 0; cursor: auto; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; overflow-x: hidden; overflow-y: auto; }
+#undiscord #logArea { font-family: Consolas, Liberation Mono, Menlo, Courier, monospace; font-size: 0.75rem; padding: 10px; user-select: text; flex: 1 1 0 !important; min-width: 0; min-height: 0; width: 100%; cursor: auto; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; overflow-x: hidden; overflow-y: auto; }
 #undiscord #logArea .log { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; max-width: 100%; line-height: 1.45; margin-bottom: 4px; }
 #undiscord .tbar { padding: 8px; background-color: var(--bg-overlay-2, var(--__header-bar-background)); }
 #undiscord .tbar button { margin-right: 4px; margin-bottom: 4px; }
-#undiscord .footer { display: flex !important; align-items: center !important; cursor: se-resize; padding-right: 30px; flex-wrap: nowrap !important; gap: 12px !important; }
-#undiscord .footer label { display: inline-flex !important; align-items: center !important; white-space: nowrap !important; flex-shrink: 0 !important; gap: 6px !important; margin: 0 !important; }
-#undiscord .footer #progressPercent { padding: 0 1em; font-size: small; color: var(--interactive-muted); flex-grow: 1; min-width: 0; overflow-wrap: anywhere; word-break: break-word; white-space: normal; }
+#undiscord .main > .main-footer { display: flex !important; flex-direction: column !important; flex-wrap: nowrap !important; align-items: stretch !important; flex-shrink: 0 !important; overflow: visible !important; }
+#undiscord .main > .main-footer .progress-stats { flex: 0 0 auto !important; width: 100% !important; min-width: 0 !important; display: flex !important; flex-wrap: nowrap !important; overflow: visible !important; }
+#undiscord .main > .main-footer .main-footer-options { flex: 0 0 auto !important; width: 100% !important; display: flex !important; flex-wrap: nowrap !important; gap: 10px !important; }
+#undiscord .main > .main-footer .main-footer-options label { white-space: nowrap !important; flex-shrink: 0 !important; font-size: 11px !important; }
 .resize-handle { position: absolute; bottom: -15px; right: -15px; width: 30px; height: 30px; transform: rotate(-45deg); background: repeating-linear-gradient(0, var(--background-modifier-accent), var(--background-modifier-accent) 1px, transparent 2px, transparent 4px); cursor: nwse-resize; }
 /**** Elements ****/
 #undiscord progress { height: 8px; margin-top: 4px; flex-grow: 1; }
@@ -1039,17 +1431,59 @@
                             </div>
                             <p class="field-hint">Retries when Discord returns an empty search page before stopping.</p>
                         </div>
-                        <p class="field-group-title">Authentication</p>
-                        <div class="field">
-                            <div class="field-label">
-                                <span>Token</span>
-                                <a class="field-help" href="{{WIKI}}/authToken" title="Help" target="_blank" rel="noopener noreferrer">Help</a>
+                    </div>
+                </details>
+
+                <details class="sidebar-section sidebar-section-danger" id="tokenVaultSection">
+                    <summary class="token-vault-summary">
+                        <span class="token-vault-label">⚠ Account token</span>
+                        <span class="token-vault-sub">Danger — full account access</span>
+                        <span id="tokenStatusBadge" class="token-status-badge token-status-unknown" title="Shows whether a token is loaded; never displays the token itself">Checking…</span>
+                    </summary>
+                    <div class="sidebar-section-body token-vault-body">
+                        <div id="tokenVaultGate" class="token-vault-gate">
+                            <p class="token-vault-warn-title">Extremely sensitive</p>
+                            <ul class="token-vault-warn-list">
+                                <li>Your token is <strong>full login access</strong> to your Discord account until Discord resets it.</li>
+                                <li>Anyone with it can read DMs, change settings, and delete messages as you.</li>
+                                <li>The field stays <strong>permanently masked</strong> (dots only) — copying does not reveal it on screen.</li>
+                                <li><strong>Privacy mode does not remove the token from memory</strong> while unlocked — it only masks other fields and log lines.</li>
+                                <li>Never screenshot, stream, or share this panel. Close when finished.</li>
+                            </ul>
+                            <label class="token-vault-ack">
+                                <input id="tokenVaultAckCheckbox" type="checkbox">
+                                <span>I am in private, no one can see my screen, and I will not share or record anything in this section.</span>
+                            </label>
+                            <button type="button" class="btn danger" id="tokenVaultUnlock" disabled>Show token field</button>
+                        </div>
+                        <div id="tokenVaultInner" class="token-vault-inner" hidden>
+                            <p class="field-hint field-hint-warn">Auto-fill runs in the background when enabled — you usually do not need to open this section.</p>
+                            <div class="check-list" style="border-color: #ed4245;">
+                                <label title="Try to detect your token automatically (localStorage, webpack, Discord traffic). No token is saved to disk by this script.">
+                                    <input id="autoFillToken" type="checkbox" checked>
+                                    <span>Auto-fill token in the background</span>
+                                </label>
                             </div>
-                            <div class="field-row">
-                                <div class="input-wrapper">
-                                    <input class="input" id="token" type="text" autocomplete="off" placeholder="Usually auto-filled" priv>
+                            <div class="field">
+                                <div class="field-label">
+                                    <span>Authorization token</span>
+                                    <a class="field-help" href="{{WIKI}}/authToken" title="Help" target="_blank" rel="noopener noreferrer">Help</a>
                                 </div>
-                                <button type="button" class="field-btn" id="getToken">Fill</button>
+                                <div class="field-row">
+                                    <div class="input-wrapper">
+                                        <input class="input" id="token" type="text" autocomplete="off" spellcheck="false" placeholder="Auto-filled when possible" priv data-form-type="other" title="Always shown as dots — enable Copy below if you need the clipboard">
+                                    </div>
+                                    <button type="button" class="field-btn" id="getToken" title="Force token detection now">Fill</button>
+                                    <button type="button" class="field-btn field-btn-danger" id="clearToken" title="Clear token from this form only">Clear</button>
+                                </div>
+                                <label class="token-vault-ack" style="margin-top: 10px;">
+                                    <input id="enableTokenCopy" type="checkbox">
+                                    <span>I know what I am doing — show the <strong>Copy</strong> button (still copies in secret; field stays dotted).</span>
+                                </label>
+                                <div class="field-row" id="tokenCopyRow" hidden>
+                                    <button type="button" class="field-btn field-btn-danger" id="copyToken" title="Copy token to clipboard (confirmation required)">Copy token</button>
+                                </div>
+                                <p class="field-hint">Only sent to <code>discord.com</code> for delete/search. Pasting this token anywhere public can compromise your account. Click <b>Clear</b> on shared PCs.</p>
                             </div>
                         </div>
                     </div>
@@ -1079,7 +1513,16 @@
                     <progress id="progressBar" style="display:none;"></progress>
                 </div>
             </div>
-            <div id="logArea" class="logarea scroll" role="log" aria-live="polite">
+            <div class="fingerprint-status-slot">
+                <div id="fingerprintStatusBar" class="fingerprint-status-bar fingerprint-unknown">
+                    <div class="fingerprint-status-pill" id="fingerprintStatusPill">—</div>
+                    <div class="fingerprint-status-copy">
+                        <div class="fingerprint-status-title" id="fingerprintStatusTitle">API fingerprint</div>
+                        <div class="fingerprint-status-detail" id="fingerprintStatusDetail">Press ▶ Delete to check full vs partial mode</div>
+                    </div>
+                </div>
+            </div>
+            <div id="logArea" class="logarea scroll" role="log">
                 <div class="" style="background: var(--background-mentioned); padding: .5em;">Default <b>Fast wipe</b> runs unattended. Use <b>Review photos &amp; backup</b> only when you want to save attachments before deleting. Tip: if deletion stops early, increase <b>Empty page retries</b> under Advanced.</div>
                 <center>
                     <div>Star <a href="{{HOME}}" target="_blank" rel="noopener noreferrer">this project</a> on GitHub!</div>
@@ -1087,18 +1530,22 @@
                     <div>Based on <a href="{{ORIGINAL}}" target="_blank" rel="noopener noreferrer">Undiscord</a> by victornpb</div>
                 </center>
             </div>
-            <div class="tbar footer row">
-                <div id="progressPercent"></div>
-                <span class="spacer"></span>
-                <label>
-                    <input id="autoScroll" type="checkbox" checked> Auto scroll
-                </label>
-                <label title="Live toggle — applies from the next page/delete onward while a run is active (not retroactive)">
-                    <input id="verboseLog" type="checkbox"> Verbose log
-                </label>
-                <label title="Live toggle — each delete logged from when enabled; past deletes are not replayed">
-                    <input id="logDeletions" type="checkbox"> Log each deletion
-                </label>
+            <div class="main-footer">
+                <div id="progressPercent" class="progress-stats"></div>
+                <div class="main-footer-options">
+                    <label>
+                        <input id="autoScroll" type="checkbox" checked> Auto scroll
+                    </label>
+                    <label title="Live toggle — applies from the next page/delete onward while a run is active (not retroactive)">
+                        <input id="verboseLog" type="checkbox"> Verbose log
+                    </label>
+                    <label title="Live toggle — each delete logged from when enabled; past deletes are not replayed">
+                        <input id="logDeletions" type="checkbox"> Log each deletion
+                    </label>
+                    <label title="Log a safe summary of script requests to discord.com/api (header names + fingerprint mode). No token, cookie, or full X-Super-Properties values.">
+                        <input id="debugApiHeaders" type="checkbox"> Debug API headers
+                    </label>
+                </div>
                 <div class="resize-handle"></div>
             </div>
         </div>
@@ -1413,6 +1860,7 @@
 	    emptyPageRetries: 2, // Retries when search returns an empty page before stopping
 	    verboseLog: false, // Show technical per-page details in the log panel
 	    logEveryDeletion: false, // Log each deleted message in the panel
+	    debugApiHeaders: false, // Log safe outgoing API request summaries (no secrets)
 	    maxAttempt: 2, // Attempts to delete a single message if it fails
 	    askForConfirmation: true,
 	    retryOnNetworkError: true,
@@ -1535,9 +1983,9 @@
 	    this.state.lastLogMaintenanceTime = now;
 	    if (this.options.autoLogHourly) {
 	      if (saveLogToFile(this.options.autoLogHourlyMessagesOnly)) log.info('Hourly auto-save — log file written.');
-	      if (ui.logArea) ui.logArea.innerHTML = '';
+	      if (ui.logArea) clearLogForRun();
 	    } else if (this.options.autoClearLogHourly && ui.logArea) {
-	      ui.logArea.innerHTML = '';
+	      clearLogForRun();
 	      log.info('Hourly log clear.');
 	    }
 	  }
@@ -1609,10 +2057,7 @@
 	      try {
 	        const reqCtl = this.beginAbortableRequest();
 	        this.beforeRequest();
-	        resp = await fetch(url, {
-	          headers: { Authorization: this.options.authToken },
-	          signal: reqCtl.signal,
-	        });
+	        resp = await this.discordFetch(url, { signal: reqCtl.signal });
 	        this.endAbortableRequest(reqCtl);
 	        this.afterRequest();
 	        break;
@@ -1831,15 +2276,15 @@
 	    try {
 	      const reqCtl = this.beginAbortableRequest();
 	      this.beforeRequest();
-	      const resp = await fetch(`https://discord.com/api/v9/channels/${id}`, {
-	        method: 'PATCH',
-	        headers: {
-	          Authorization: this.options.authToken,
-	          'Content-Type': 'application/json',
+	      const resp = await this.discordFetch(
+	        `https://discord.com/api/v9/channels/${id}`,
+	        {
+	          method: 'PATCH',
+	          body: JSON.stringify({ archived: false }),
+	          signal: reqCtl.signal,
 	        },
-	        body: JSON.stringify({ archived: false }),
-	        signal: reqCtl.signal,
-	      });
+	        { channelId: id },
+	      );
 	      this.endAbortableRequest(reqCtl);
 	      this.afterRequest();
 	      if (resp.ok) {
@@ -2473,22 +2918,23 @@
 	        const searchContent = strictMediaOnly ? undefined : (this.options.content || undefined);
 	        const reqCtl = this.beginAbortableRequest();
 	        this.beforeRequest();
-	        resp = await fetch(API_SEARCH_URL + 'search?' + queryString([
-	          ['author_id', this.options.authorId || undefined],
-	          ['channel_id', queryChannelId],
-	          ['min_id', this.options.minId ? toSnowflake(this.options.minId) : undefined],
-	          ['max_id', this.options.maxId ? toSnowflake(this.options.maxId) : undefined],
-	          ['sort_by', 'timestamp'],
-	          ['sort_order', 'desc'],
-	          ['offset', this.state.offset],
-	          ['has', searchHasLink ? 'link' : undefined],
-	          ['has', searchHasFile ? 'file' : undefined],
-	          ['content', searchContent],
-	          ['include_nsfw', this.options.includeNsfw ? true : undefined],
-	        ]), {
-	          headers: { Authorization: this.options.authToken },
-	          signal: reqCtl.signal,
-	        });
+	        resp = await this.discordFetch(
+	          API_SEARCH_URL + 'search?' + queryString([
+	            ['author_id', this.options.authorId || undefined],
+	            ['channel_id', queryChannelId],
+	            ['min_id', this.options.minId ? toSnowflake(this.options.minId) : undefined],
+	            ['max_id', this.options.maxId ? toSnowflake(this.options.maxId) : undefined],
+	            ['sort_by', 'timestamp'],
+	            ['sort_order', 'desc'],
+	            ['offset', this.state.offset],
+	            ['has', searchHasLink ? 'link' : undefined],
+	            ['has', searchHasFile ? 'file' : undefined],
+	            ['content', searchContent],
+	            ['include_nsfw', this.options.includeNsfw ? true : undefined],
+	          ]),
+	          { signal: reqCtl.signal },
+	          { channelId: queryChannelId || this.options.channelId },
+	        );
 	        this.endAbortableRequest(reqCtl);
 	        this.afterRequest();
 
@@ -2735,11 +3181,11 @@
 	      try {
 	        const reqCtl = this.beginAbortableRequest();
 	        this.beforeRequest();
-	        resp = await fetch(API_DELETE_URL, {
-	          method: 'DELETE',
-	          headers: { Authorization: this.options.authToken },
-	          signal: reqCtl.signal,
-	        });
+	        resp = await this.discordFetch(
+	          API_DELETE_URL,
+	          { method: 'DELETE', signal: reqCtl.signal },
+	          { channelId: message.channel_id },
+	        );
 	        this.endAbortableRequest(reqCtl);
 	        this.afterRequest();
 	      } catch (err) {
@@ -2849,6 +3295,15 @@
 	      `Rate Limited: ${this.stats.throttledCount} times.`,
 	      `Total time throttled: ${msToHMS(this.stats.throttledTotalTime)}.`
 	    );
+	  }
+
+	  /** Discord API fetch with client-like headers (Tampermonkey / Violentmonkey / Greasemonkey). */
+	  discordFetch(url, init = {}, ref = {}) {
+	    return discordApiFetch(url, this.options.authToken, init, {
+	      guildId: ref.guildId ?? this.options.guildId,
+	      channelId: ref.channelId ?? this.options.channelId,
+	      jsonBody: !!init.body,
+	    });
 	  }
 	}
 
@@ -3170,6 +3625,629 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	  }
 	}
 
+	function normalizeAuthHeader(raw) {
+	  if (typeof raw !== 'string') return '';
+	  const s = raw.trim();
+	  if (!s) return '';
+	  if (/^bearer\s+/i.test(s)) return normalizeTokenCandidate(s.replace(/^bearer\s+/i, ''));
+	  return normalizeTokenCandidate(s);
+	}
+
+	function looksLikeDiscordToken(token) {
+	  if (!token || token.length < 50) return false;
+	  if (token.startsWith('mfa.')) return true;
+	  const parts = token.split('.');
+	  return parts.length >= 3 && parts.every(p => p.length >= 6);
+	}
+
+	function installAuthCaptureMessageBridge() {
+	  if (window.__undiscord_eb_auth_bridge) return;
+	  window.__undiscord_eb_auth_bridge = true;
+	  window.addEventListener('message', (event) => {
+	    if (event.origin !== location.origin) return;
+	    const data = event.data;
+	    if (!data || data.source !== 'undiscord') return;
+	    if (data.type === 'auth') {
+	      const token = normalizeAuthHeader(String(data.token || ''));
+	      if (token) capturedAuthCache = token;
+	      return;
+	    }
+	    if (data.type === 'superProps') {
+	      applyCapturedSuperProperties(String(data.value || '').trim(), 'live capture');
+	    }
+	  });
+	}
+
+	let superPropertiesSniffLogged = false;
+
+	function applyCapturedSuperProperties(sp, sourceLabel = 'background capture') {
+	  const v = String(sp || '').trim();
+	  if (!looksLikeSuperPropertiesBase64(v)) return false;
+	  if (!superPropertiesSniffLogged) {
+	    superPropertiesSniffLogged = true;
+	    log.verb('Sniffed X-Super-Properties from Discord API traffic.');
+	  }
+	  capturedSuperPropertiesCache = v;
+	  const prev = clientHeadersCache;
+	  clientHeadersCache = {
+	    superProperties: v,
+	    locale: prev?.locale || getDiscordLocaleFallback(),
+	    timezone: prev?.timezone || getDiscordTimezone(),
+	    mode: 'full',
+	    at: Date.now(),
+	  };
+	  try {
+	    if (document.querySelector('#undiscord #fingerprintStatusBar')) {
+	      updateFingerprintStatusBar('full', sourceLabel);
+	    }
+	  } catch {}
+	  return true;
+	}
+
+	let earlyCaptureRetryTimer = null;
+
+	/** Install page fetch/XHR hook as early as possible (document-start + retries until DOM ready). */
+	function scheduleEarlyPageCapture() {
+	  installAuthCaptureMessageBridge();
+	  const attempt = () => {
+	    if (pageWindow.__undiscord_eb_auth_hook) return true;
+	    try {
+	      const doc = pageWindow.document;
+	      if (!doc?.documentElement) return false;
+	      installPageAuthCaptureHook();
+	      return !!pageWindow.__undiscord_eb_auth_hook;
+	    } catch {
+	      return false;
+	    }
+	  };
+	  if (attempt()) return;
+	  const retry = () => { attempt(); };
+	  pageWindow.addEventListener('DOMContentLoaded', retry);
+	  pageWindow.addEventListener('load', retry);
+	  if (earlyCaptureRetryTimer) clearInterval(earlyCaptureRetryTimer);
+	  let tries = 0;
+	  earlyCaptureRetryTimer = setInterval(() => {
+	    if (attempt() || ++tries >= 40) clearInterval(earlyCaptureRetryTimer);
+	  }, 500);
+	}
+
+	function injectPageScript(code) {
+	  if (typeof GM_addElement === 'function') {
+	    try {
+	      GM_addElement('script', { textContent: code });
+	      return;
+	    } catch {}
+	  }
+	  const script = pageWindow.document.createElement('script');
+	  script.textContent = code;
+	  (pageWindow.document.head || pageWindow.document.documentElement).appendChild(script);
+	  script.remove();
+	}
+
+	/** Sniff Authorization from Discord's own fetch/XHR (real page context). */
+	function installPageAuthCaptureHook() {
+	  installAuthCaptureMessageBridge();
+	  if (pageWindow.__undiscord_eb_auth_hook) return;
+	  const hookScript = `(function(){
+if(window.__undiscord_eb_auth_hook)return;
+window.__undiscord_eb_auth_hook=1;
+var KEY='${AUTH_CAPTURE_KEY}',SP='${SUPER_PROPERTIES_CAPTURE_KEY}';
+function save(s){if(!s||s.length<50)return;window[KEY]=s;try{window.postMessage({source:'undiscord',type:'auth',token:s},'*');}catch(e){}}
+function saveSp(v){if(!v||typeof v!=='string')return;v=v.trim();if(v.length<20)return;window[SP]=v;try{window.postMessage({source:'undiscord',type:'superProps',value:v},'*');}catch(e){}}
+function norm(h){if(!h||typeof h!=='string')return;var s=h.trim();if(!s)return;if(/^bearer\\s+/i.test(s))s=s.replace(/^bearer\\s+/i,'');try{var p=JSON.parse(s);if(typeof p==='string')s=p;}catch(e){s=s.replace(/^"|"$/g,'');}save(s);}
+function sp(h){if(!h)return;var v='';if(typeof Headers!=='undefined'&&h instanceof Headers){v=h.get('X-Super-Properties')||h.get('x-super-properties')||'';}else if(Array.isArray(h)){for(var i=0;i<h.length;i+=2){if(h[i]&&String(h[i]).toLowerCase()==='x-super-properties'){v=h[i+1];break;}}}else if(typeof h==='object'){v=h['X-Super-Properties']||h['x-super-properties']||'';}saveSp(v);}
+function fromHeaders(h){if(!h)return;if(typeof Headers!=='undefined'&&h instanceof Headers){var a=h.get('Authorization')||h.get('authorization');if(a)norm(a);sp(h);return;}if(Array.isArray(h)){for(var i=0;i<h.length;i+=2){var k=h[i],v=h[i+1];if(k&&String(k).toLowerCase()==='authorization')norm(v);if(k&&String(k).toLowerCase()==='x-super-properties')saveSp(v);}}else if(typeof h==='object'){var b=h.Authorization||h.authorization;if(b)norm(b);sp(h);}}
+function isDiscordApi(u){try{return u&&String(u).indexOf('discord.com/api')!==-1;}catch(e){return false;}}
+function urlOf(input){try{var u=typeof input==='string'?input:(input&&input.url)||'';if(u&&u.charAt(0)==='/')u=location.origin+u;return u;}catch(e){return '';}}
+var _fetch=window.fetch;
+window.fetch=function(input,init){try{var u=urlOf(input);if(isDiscordApi(u)){if(input instanceof Request)fromHeaders(input.headers);if(init&&init.headers)fromHeaders(init.headers);}}catch(e){}return _fetch.apply(this,arguments);};
+var _open=XMLHttpRequest.prototype.open,_send=XMLHttpRequest.prototype.send,_set=XMLHttpRequest.prototype.setRequestHeader;
+XMLHttpRequest.prototype.open=function(m,u){this.__undiscord_hdrs={};this.__undiscord_url=u;return _open.apply(this,arguments);};
+XMLHttpRequest.prototype.setRequestHeader=function(k,v){try{this.__undiscord_hdrs=this.__undiscord_hdrs||{};this.__undiscord_hdrs[String(k).toLowerCase()]=v;}catch(e){}return _set.apply(this,arguments);};
+XMLHttpRequest.prototype.send=function(){try{var u=this.__undiscord_url;if(u&&String(u).charAt(0)==='/')u=location.origin+u;if(isDiscordApi(u)){var a=this.__undiscord_hdrs&&this.__undiscord_hdrs.authorization;if(a)norm(a);var p=this.__undiscord_hdrs&&this.__undiscord_hdrs['x-super-properties'];if(p)saveSp(p);}}catch(e){}return _send.apply(this,arguments);};
+})();`;
+	  injectPageScript(hookScript);
+	}
+
+	function readCapturedAuthToken() {
+	  if (capturedAuthCache) return capturedAuthCache;
+	  try {
+	    const w = pageWindow;
+	    const direct = normalizeAuthHeader(String(w[AUTH_CAPTURE_KEY] || ''));
+	    if (direct) return direct;
+	    const wrapped = w.wrappedJSObject;
+	    if (wrapped) {
+	      const viaWrapped = normalizeAuthHeader(String(wrapped[AUTH_CAPTURE_KEY] || ''));
+	      if (viaWrapped) return viaWrapped;
+	    }
+	  } catch {}
+	  return '';
+	}
+
+	/** Cached Discord client fingerprint headers (works with Tampermonkey, Violentmonkey, Greasemonkey + unsafeWindow). */
+	let clientHeadersCache = null;
+
+	function getDiscordTimezone() {
+	  try {
+	    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+	  } catch {
+	    return 'UTC';
+	  }
+	}
+
+	function getDiscordLocaleFallback() {
+	  try {
+	    const raw = pageWindow.localStorage?.getItem('locale')
+	      || pageWindow.localStorage?.getItem('discord_locale');
+	    if (raw) {
+	      const loc = normalizeTokenCandidate(raw).replace(/^"|"$/g, '');
+	      if (loc) return loc;
+	    }
+	  } catch {}
+	  const nav = (navigator.language || 'en-US').replace('_', '-');
+	  return nav || 'en-US';
+	}
+
+	function looksLikeSuperPropertiesBase64(value) {
+	  const v = String(value || '').trim();
+	  return v.length > 20 && /^[A-Za-z0-9+/]+=*$/.test(v);
+	}
+
+	function trySuperPropertiesFromExport(exp, ctx) {
+	  if (!exp) return '';
+	  const targets = [exp.default, exp];
+	  for (const t of targets) {
+	    if (!t) continue;
+	    const fn = t.getSuperPropertiesBase64;
+	    if (typeof fn === 'function') {
+	      try {
+	        const v = String(fn.call(t) ?? '').trim();
+	        if (looksLikeSuperPropertiesBase64(v)) return v;
+	      } catch {}
+	    }
+	    if (typeof t.getSuperProperties === 'function') {
+	      try {
+	        const raw = t.getSuperProperties();
+	        const encoded = typeof raw === 'string'
+	          ? raw
+	          : (typeof btoa === 'function' ? btoa(JSON.stringify(raw)) : '');
+	        if (looksLikeSuperPropertiesBase64(encoded)) return encoded.trim();
+	      } catch {}
+	    }
+	  }
+	  for (const key of Object.keys(exp)) {
+	    if (!/super.?propert/i.test(key)) continue;
+	    const val = exp[key];
+	    if (typeof val === 'function') {
+	      try {
+	        const v = String(val.call(ctx ?? exp.default ?? exp) ?? '').trim();
+	        if (looksLikeSuperPropertiesBase64(v)) return v;
+	      } catch {}
+	    }
+	  }
+	  if (exp.default && typeof exp.default === 'object') {
+	    for (const key of Object.keys(exp.default)) {
+	      if (!/super.?propert/i.test(key)) continue;
+	      const val = exp.default[key];
+	      if (typeof val === 'function') {
+	        try {
+	          const v = String(val.call(exp.default) ?? '').trim();
+	          if (looksLikeSuperPropertiesBase64(v)) return v;
+	        } catch {}
+	      }
+	    }
+	  }
+	  return '';
+	}
+
+	function extractSuperPropertiesFromWebpackReq(req) {
+	  if (!req?.c) return '';
+	  for (const mod of Object.values(req.c)) {
+	    const v = trySuperPropertiesFromExport(mod?.exports, mod?.exports?.default);
+	    if (v) return v;
+	  }
+	  return '';
+	}
+
+	function readCapturedSuperProperties() {
+	  if (capturedSuperPropertiesCache) return capturedSuperPropertiesCache;
+	  try {
+	    const w = pageWindow;
+	    const direct = String(w[SUPER_PROPERTIES_CAPTURE_KEY] || '').trim();
+	    if (looksLikeSuperPropertiesBase64(direct)) return direct;
+	    const wrapped = w.wrappedJSObject;
+	    if (wrapped) {
+	      const viaWrapped = String(wrapped[SUPER_PROPERTIES_CAPTURE_KEY] || '').trim();
+	      if (looksLikeSuperPropertiesBase64(viaWrapped)) return viaWrapped;
+	    }
+	  } catch {}
+	  return '';
+	}
+
+	async function waitForCapturedSuperProperties(maxMs = 8000) {
+	  const start = Date.now();
+	  while (Date.now() - start < maxMs) {
+	    const v = readCapturedSuperProperties();
+	    if (v) return v;
+	    await wait(300);
+	  }
+	  return '';
+	}
+
+	function randomUuid() {
+	  try {
+	    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+	  } catch {}
+	  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+	    const r = (Math.random() * 16) | 0;
+	    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+	  });
+	}
+
+	function getOrCreateSessionLaunchIds() {
+	  const key = 'undiscord_eb_launch_ids';
+	  try {
+	    const raw = pageWindow.sessionStorage?.getItem(key);
+	    if (raw) {
+	      const parsed = JSON.parse(raw);
+	      if (parsed?.client_launch_id && parsed?.launch_signature) return parsed;
+	    }
+	  } catch {}
+	  const ids = { client_launch_id: randomUuid(), launch_signature: randomUuid() };
+	  try { pageWindow.sessionStorage?.setItem(key, JSON.stringify(ids)); } catch {}
+	  return ids;
+	}
+
+	function parseBrowserEnvFromUa() {
+	  const ua = String(pageWindow.navigator?.userAgent || navigator.userAgent || '');
+	  let os = 'Windows';
+	  let os_version = '10';
+	  if (/Macintosh|Mac OS X/i.test(ua)) {
+	    os = 'Mac OS X';
+	    const m = ua.match(/Mac OS X (\d+[._]\d+)/i);
+	    os_version = m ? m[1].replace('_', '.') : '10.15.7';
+	  } else if (/Linux/i.test(ua)) {
+	    os = 'Linux';
+	    os_version = '';
+	  } else if (/Windows NT 11/i.test(ua)) os_version = '10';
+	  else if (/Windows NT 10/i.test(ua)) os_version = '10';
+
+	  let browser = 'Firefox';
+	  let browser_version = '115.0';
+	  const ff = ua.match(/Firefox\/([\d.]+)/i);
+	  const chr = ua.match(/Chrome\/([\d.]+)/i);
+	  const edg = ua.match(/Edg\/([\d.]+)/i);
+	  if (edg) {
+	    browser = 'Chrome';
+	    browser_version = edg[1];
+	  } else if (chr && !/Firefox/i.test(ua)) {
+	    browser = 'Chrome';
+	    browser_version = chr[1];
+	  } else if (ff) {
+	    browser_version = ff[1];
+	  }
+	  return { os, os_version, browser, browser_version, browser_user_agent: ua };
+	}
+
+	function getClientBuildNumberFromPage() {
+	  try {
+	    const g = pageWindow;
+	    const fromGlobal = Number(g?.GLOBAL_ENV?.BUILD_NUMBER ?? g?.GLOBAL_ENV?.buildNumber);
+	    if (fromGlobal > 100000) return fromGlobal;
+	  } catch {}
+	  try {
+	    const req = acquireWebpackRequire(pageWindow);
+	    if (req?.c) {
+	      for (const mod of Object.values(req.c)) {
+	        const ex = mod?.exports;
+	        for (const t of [ex?.default, ex]) {
+	          if (!t || typeof t !== 'object') continue;
+	          for (const key of ['CLIENT_BUILD_NUMBER', 'BUILD_NUMBER', 'buildNumber', 'clientBuildNumber']) {
+	            const n = Number(t[key]);
+	            if (n > 100000) return n;
+	          }
+	        }
+	      }
+	    }
+	  } catch {}
+	  try {
+	    const scripts = pageWindow.document?.querySelectorAll('script:not([src])');
+	    for (const s of scripts || []) {
+	      const text = s.textContent || '';
+	      if (text.length < 80 || text.length > 800000) continue;
+	      const m = text.match(/(?:client_build_number|BUILD_NUMBER|buildNumber)["'\s:]+(\d{5,8})/i);
+	      if (m) return Number(m[1]);
+	    }
+	  } catch {}
+	  return null;
+	}
+
+	/** Build X-Super-Properties when sniff/webpack fail (Firefox + VM often cannot read Discord's module). */
+	function buildSyntheticSuperPropertiesBase64() {
+	  try {
+	    let build = getClientBuildNumberFromPage();
+	    if (!build) {
+	      build = 547794;
+	      log.verb('Discord build number not found on page — using fallback 547794 (from current stable web client).');
+	    }
+	    const locale = getDiscordLocaleFallback();
+	    const { os, os_version, browser, browser_version, browser_user_agent } = parseBrowserEnvFromUa();
+	    const launch = getOrCreateSessionLaunchIds();
+	    const payload = {
+	      os,
+	      browser,
+	      device: '',
+	      system_locale: locale,
+	      has_client_mods: false,
+	      browser_user_agent,
+	      browser_version,
+	      os_version,
+	      referrer: '',
+	      referring_domain: '',
+	      referrer_current: 'https://discord.com/',
+	      referring_domain_current: 'discord.com',
+	      release_channel: 'stable',
+	      client_build_number: build,
+	      client_event_source: null,
+	      client_launch_id: launch.client_launch_id,
+	      launch_signature: launch.launch_signature,
+	      client_heartbeat_session_id: randomUuid(),
+	      client_app_state: 'focused',
+	    };
+	    const json = JSON.stringify(payload);
+	    const b64 = typeof pageWindow.btoa === 'function'
+	      ? pageWindow.btoa(json)
+	      : (typeof btoa === 'function' ? btoa(json) : '');
+	    return looksLikeSuperPropertiesBase64(b64) ? b64 : '';
+	  } catch {
+	    return '';
+	  }
+	}
+
+	function getSuperPropertiesFromPageContext() {
+	  return new Promise((resolve) => {
+	    const reqId = `undiscord_sp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+	    const timeoutMs = 12000;
+	    let done = false;
+	    const cleanup = () => {
+	      if (done) return;
+	      done = true;
+	      pageWindow.removeEventListener('message', onMessage);
+	    };
+	    const onMessage = (event) => {
+	      if (event.origin !== location.origin) return;
+	      const data = event.data;
+	      if (!data || data.source !== 'undiscord' || data.type !== 'superProperties' || data.id !== reqId) return;
+	      cleanup();
+	      resolve(typeof data.value === 'string' && data.value.length > 20 ? data.value : '');
+	    };
+	    pageWindow.addEventListener('message', onMessage);
+	    const script = `(function(){try{
+var req=null,keys=Object.keys(window).filter(function(k){return k.indexOf('webpackChunk')===0&&Array.isArray(window[k]);});
+for(var i=0;i<keys.length&&!req;i++){try{var ch=window[keys[i]];ch.push([['__undiscord_sp__'+Date.now()],{},function(r){req=r;}]);}catch(e){}}
+if(!req&&typeof window.__webpack_require__==='function'&&window.__webpack_require__.c)req=window.__webpack_require__;
+if(!req||!req.c)throw new Error('no webpack');
+var mods=Object.values(req.c),v='';
+for(var j=0;j<mods.length;j++){var ex=mods[j]&&mods[j].exports;if(!ex)continue;var t=[ex.default,ex];for(var k=0;k<t.length;k++){if(!t[k])continue;var fn=t[k].getSuperPropertiesBase64;if(typeof fn==='function'){v=String(fn.call(t[k])||'').trim();if(v.length>20)break;}}if(v)break;}
+window.postMessage({source:'undiscord',type:'superProperties',id:'${reqId}',value:v||''},'*');
+}catch(e){window.postMessage({source:'undiscord',type:'superProperties',id:'${reqId}',value:''},'*');}})();`;
+	    injectPageScript(script);
+	    setTimeout(() => { cleanup(); resolve(''); }, timeoutMs);
+	  });
+	}
+
+	function refreshClientHeaderContextSync(force = false) {
+	  const ttlMs = 5 * 60 * 1000;
+	  if (!force && clientHeadersCache && (Date.now() - clientHeadersCache.at) < ttlMs) {
+	    return clientHeadersCache;
+	  }
+	  let superProperties = readCapturedSuperProperties();
+	  if (!superProperties) {
+	    try {
+	      superProperties = extractSuperPropertiesFromWebpackReq(acquireWebpackRequire(pageWindow));
+	    } catch {}
+	  }
+	  if (!superProperties) {
+	    superProperties = buildSyntheticSuperPropertiesBase64();
+	  }
+	  clientHeadersCache = {
+	    superProperties,
+	    locale: getDiscordLocaleFallback(),
+	    timezone: getDiscordTimezone(),
+	    at: Date.now(),
+	    mode: superProperties ? 'full' : 'partial',
+	  };
+	  return clientHeadersCache;
+	}
+
+	function updateFingerprintStatusBar(mode, detail = '') {
+	  const bar = document.querySelector('#undiscord #fingerprintStatusBar');
+	  const pill = document.querySelector('#undiscord #fingerprintStatusPill');
+	  const title = document.querySelector('#undiscord #fingerprintStatusTitle');
+	  const detailEl = document.querySelector('#undiscord #fingerprintStatusDetail');
+	  if (!bar || !pill || !title || !detailEl) return;
+	  const ctx = clientHeadersCache || {};
+	  bar.className = `fingerprint-status-bar fingerprint-${mode}`;
+	  if (mode === 'full') {
+	    pill.textContent = 'Full';
+	    title.textContent = 'Client-like API fingerprint';
+	    detailEl.textContent = `X-Super-Properties active${detail ? ` · ${detail}` : ''} · ${ctx.locale || '?'} · ${ctx.timezone || '?'}`;
+	  } else if (mode === 'partial') {
+	    pill.textContent = 'Partial';
+	    title.textContent = 'Reduced API fingerprint';
+	    detailEl.textContent = `No X-Super-Properties · ${ctx.locale || '?'} · ${ctx.timezone || '?'} · Referer + token · deletes may still work`;
+	  } else {
+	    pill.textContent = '—';
+	    title.textContent = 'API fingerprint';
+	    detailEl.textContent = 'Press ▶ Delete to check full vs partial mode';
+	  }
+	}
+
+	function clearLogForRun() {
+	  if (!ui.logArea) return;
+	  ui.logArea.replaceChildren();
+	}
+
+	function applyFullFingerprintToCache(superProperties, sourceLabel) {
+	  capturedSuperPropertiesCache = superProperties;
+	  clientHeadersCache = {
+	    ...clientHeadersCache,
+	    superProperties,
+	    mode: 'full',
+	    at: Date.now(),
+	  };
+	  updateFingerprintStatusBar('full', sourceLabel);
+	  log.success(`API fingerprint: full mode ready (${sourceLabel}).`);
+	  log.info('Includes X-Super-Properties plus locale, timezone, and channel Referer — closest match to the Discord web app.');
+	  return clientHeadersCache;
+	}
+
+	function logPartialFingerprintFallback() {
+	  const ctx = clientHeadersCache || {};
+	  updateFingerprintStatusBar('partial');
+	  log.warn('API fingerprint: full mode not available — continuing in partial mode.');
+	  log.info(
+	    `Partial mode still sends: locale (${ctx.locale || '?'}), timezone (${ctx.timezone || '?'}), `
+	    + 'Referer, and your token. Deletes often work; full mode is preferred when Discord exposes X-Super-Properties.',
+	  );
+	  const autofillOn = document.querySelector('#undiscord input#autofillOnNavigate')?.checked;
+	  log.info(
+	    autofillOn
+	      ? 'Tip: reload Discord, open the target DM, scroll chat (do not switch channels — Auto-fill IDs changes target), then Delete again.'
+	      : 'Tip: reload Discord, scroll the target channel, wait a few seconds, then Delete again.',
+	  );
+	}
+
+	async function ensureClientHeadersReady() {
+	  scheduleEarlyPageCapture();
+
+	  const browsingCapture = readCapturedSuperProperties();
+	  if (browsingCapture) {
+	    log.info('API fingerprint: using X-Super-Properties captured while Discord was open.');
+	    return applyFullFingerprintToCache(browsingCapture, 'captured while browsing');
+	  }
+
+	  log.info('API fingerprint: attempting full client mode (X-Super-Properties)…');
+
+	  refreshClientHeaderContextSync(true);
+	  if (clientHeadersCache?.superProperties) {
+	    return applyFullFingerprintToCache(clientHeadersCache.superProperties, 'cached');
+	  }
+
+	  log.info('API fingerprint: scanning Discord client code…');
+	  const fromPage = await getSuperPropertiesFromPageContext();
+	  if (fromPage) {
+	    return applyFullFingerprintToCache(fromPage, 'Discord client code');
+	  }
+
+	  log.info('API fingerprint: listening for Discord traffic (up to 8s) — scroll this channel or click in the chat (stay on your target channel)…');
+	  const sniffed = await waitForCapturedSuperProperties(8000);
+	  if (sniffed) {
+	    return applyFullFingerprintToCache(sniffed, 'live Discord request');
+	  }
+
+	  log.info('API fingerprint: building X-Super-Properties from your browser + Discord build number…');
+	  const synthetic = buildSyntheticSuperPropertiesBase64();
+	  if (synthetic) {
+	    const build = getClientBuildNumberFromPage();
+	    return applyFullFingerprintToCache(
+	      synthetic,
+	      `synthesized · build ${build || '?'}`,
+	    );
+	  }
+
+	  log.warn('API fingerprint: could not read Discord client build number — partial mode only.');
+	  logPartialFingerprintFallback();
+	  return clientHeadersCache;
+	}
+
+	function buildRefererUrl(guildId, channelId) {
+	  const gid = String(guildId || '').trim();
+	  const cid = String(channelId || '').trim();
+	  if (gid && cid) return `https://discord.com/channels/${gid}/${cid}`;
+	  try {
+	    const path = String(pageWindow.location?.pathname || location.pathname || '');
+	    if (path.startsWith('/channels/')) {
+	      return `https://discord.com${path.split('?')[0]}`;
+	    }
+	  } catch {}
+	  return 'https://discord.com/channels/@me';
+	}
+
+	function buildDiscordApiHeaders(authToken, opts = {}) {
+	  const ctx = refreshClientHeaderContextSync();
+	  const headers = {
+	    Accept: '*/*',
+	    Authorization: authToken,
+	  };
+	  if (ctx.superProperties) headers['X-Super-Properties'] = ctx.superProperties;
+	  if (ctx.locale) headers['X-Discord-Locale'] = ctx.locale;
+	  if (ctx.timezone) headers['X-Discord-Timezone'] = ctx.timezone;
+	  headers['X-Debug-Options'] = 'bugReporterEnabled';
+	  headers.Referer = buildRefererUrl(opts.guildId, opts.channelId);
+	  if (opts.jsonBody) headers['Content-Type'] = 'application/json';
+	  return headers;
+	}
+
+	const apiDebugLoggedKeys = new Set();
+
+	function resetApiDebugLogKeys() {
+	  apiDebugLoggedKeys.clear();
+	}
+
+	function peekSuperPropertiesMeta(b64) {
+	  try {
+	    const data = JSON.parse(atob(String(b64)));
+	    return {
+	      build: data?.client_build_number ?? '?',
+	      browser: data?.browser ?? '?',
+	      os: data?.os ?? '?',
+	    };
+	  } catch {
+	    return { build: '?', browser: '?', os: '?' };
+	  }
+	}
+
+	function logDiscordApiRequestDebug(url, method, headers) {
+	  if (!undiscordCore?.options?.debugApiHeaders) return;
+	  const m = String(method || 'GET').toUpperCase();
+	  let path = String(url || '').replace(/^https:\/\/discord\.com/i, '');
+	  if (!path.startsWith('/')) path = `/${path}`;
+	  const pathBase = path.split('?')[0].replace(/\/\d{17,}/g, '/:snowflake');
+	  const key = `${m} ${pathBase}`;
+	  if (apiDebugLoggedKeys.has(key)) return;
+	  apiDebugLoggedKeys.add(key);
+
+	  const ctx = clientHeadersCache || {};
+	  const sp = headers['X-Super-Properties'] || '';
+	  const spMeta = sp ? peekSuperPropertiesMeta(sp) : null;
+	  const lines = [
+	    `[API debug] ${m} ${pathBase}`,
+	    `  Fingerprint mode: ${ctx.mode || 'unknown'}${ctx.superProperties ? '' : ' (no X-Super-Properties on this request)'}`,
+	    `  Authorization: ${headers.Authorization ? 'yes (redacted)' : 'MISSING'}`,
+	    `  X-Super-Properties: ${sp ? `yes (${sp.length} chars, build ${spMeta.build}, ${spMeta.browser}/${spMeta.os})` : 'NO — partial'}`,
+	    `  X-Discord-Locale: ${headers['X-Discord-Locale'] || 'missing'}`,
+	    `  X-Discord-Timezone: ${headers['X-Discord-Timezone'] || 'missing'}`,
+	    `  X-Debug-Options: ${headers['X-Debug-Options'] || 'missing'}`,
+	    `  Referer: ${headers.Referer || 'missing'}`,
+	    `  credentials: include (browser may add Cookie separately)`,
+	  ];
+	  log.info(lines.join('\n'));
+	}
+
+	/** fetch() to discord.com/api with browser-like headers (manager-agnostic). */
+	function discordApiFetch(url, authToken, init = {}, headerOpts = {}) {
+	  const base = buildDiscordApiHeaders(authToken, headerOpts);
+	  const extra = init.headers && typeof init.headers === 'object' ? init.headers : {};
+	  const headers = { ...base, ...extra };
+	  logDiscordApiRequestDebug(url, init.method || 'GET', headers);
+	  return pageFetch(url, {
+	    ...init,
+	    credentials: init.credentials ?? 'include',
+	    headers,
+	  });
+	}
+
 	function acquireWebpackRequire(globalObj) {
 	  const chunkKeys = Object.keys(globalObj).filter(
 	    k => k.startsWith('webpackChunk') && Array.isArray(globalObj[k]),
@@ -3203,18 +4281,56 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	      return '';
 	    }
 	  };
-	  const tryString = (v) => normalizeTokenCandidate(typeof v === 'string' ? v : '');
+	  const tryString = (v) => {
+	    const t = normalizeTokenCandidate(typeof v === 'string' ? v : '');
+	    return looksLikeDiscordToken(t) ? t : '';
+	  };
+	  const tryGetter = (obj, key) => {
+	    if (!obj) return '';
+	    try {
+	      const d = Object.getOwnPropertyDescriptor(obj, key);
+	      if (d && typeof d.get === 'function') {
+	        const t = normalizeTokenCandidate(String(d.get.call(obj) ?? ''));
+	        return looksLikeDiscordToken(t) ? t : '';
+	      }
+	    } catch {}
+	    return '';
+	  };
 
 	  return (
 	    tryCall(ex?.default?.getToken)
 	    || tryCall(ex?.getToken)
 	    || tryCall(ex?.default?.getAuthorizationToken)
 	    || tryCall(ex?.getAuthorizationToken)
+	    || tryCall(ex?.default?.getAccessToken)
+	    || tryCall(ex?.getAccessToken)
 	    || tryCall(typeof ex?.default === 'function' ? ex.default : null)
+	    || tryGetter(ex?.default, 'getToken')
 	    || tryString(ex?.default?.getToken)
 	    || tryString(ex?.getToken)
 	    || ''
 	  );
+	}
+
+	function extractTokenClassicUndiscord(globalObj) {
+	  const chunk = globalObj.webpackChunkdiscord_app;
+	  if (!Array.isArray(chunk) || typeof chunk.push !== 'function') return '';
+	  const modules = [];
+	  try {
+	    chunk.push([['__undiscord_eb_classic__'], {}, (e) => {
+	      for (const c in e.c) modules.push(e.c[c]);
+	    }]);
+	  } catch {
+	    return '';
+	  }
+	  const found = modules.find(m => m?.exports?.default?.getToken !== undefined);
+	  if (!found?.exports?.default) return '';
+	  const gt = found.exports.default.getToken;
+	  if (typeof gt === 'function') {
+	    const t = normalizeTokenCandidate(String(gt() ?? ''));
+	    if (looksLikeDiscordToken(t)) return t;
+	  }
+	  return extractTokenFromModule(found);
 	}
 
 	function extractTokenFromWebpackReq(req) {
@@ -3230,20 +4346,13 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	}
 
 	function getTokenFromClassicWebpackPush(globalObj = pageWindow) {
-	  const chunk = globalObj.webpackChunkdiscord_app;
-	  if (!Array.isArray(chunk) || typeof chunk.push !== 'function') {
-	    throw new Error('webpackChunkdiscord_app unavailable');
+	  const t = extractTokenClassicUndiscord(globalObj);
+	  if (t) return t;
+	  try {
+	    return extractTokenFromWebpackReq(acquireWebpackRequire(globalObj));
+	  } catch {
+	    throw new Error('classic webpack: getToken module not found');
 	  }
-	  let modules = [];
-	  chunk.push([['__undiscord__classic__'], {}, (e) => {
-	    modules = [];
-	    for (const c in e.c) modules.push(e.c[c]);
-	  }]);
-	  for (const mod of modules) {
-	    const token = extractTokenFromModule(mod);
-	    if (token) return token;
-	  }
-	  throw new Error('classic webpack: getToken module not found');
 	}
 
 	function readTokenFromPageLocalStorage() {
@@ -3302,15 +4411,20 @@ body.undiscord-pick-message.after [id^="message-content-"]:hover::after {
 	    pageWindow.addEventListener('message', onMessage);
 	    const script = pageWindow.document.createElement('script');
 	    script.textContent = `(function(){try{
+var KEY='${AUTH_CAPTURE_KEY}';
 function norm(t){if(typeof t!=='string')return'';t=t.trim();if(!t)return'';try{var p=JSON.parse(t);return typeof p==='string'?p:'';}catch(e){return t.replace(/^"|"$/g,'');}}
-function fromMod(m){if(!m||!m.exports)return'';var ex=m.exports,f=function(fn){if(typeof fn!=='function')return'';try{return norm(String(fn()||''));}catch(e){return'';}};return f(ex.default&&ex.default.getToken)||f(ex.getToken)||f(ex.default&&ex.default.getAuthorizationToken)||f(ex.getAuthorizationToken)||f(typeof ex.default==='function'?ex.default:null)||norm(typeof ex.default&&ex.default.getToken==='string'?ex.default.getToken:'')||norm(typeof ex.getToken==='string'?ex.getToken:'');}
-var g=window,req=null,keys=Object.keys(g).filter(function(k){return k.indexOf('webpackChunk')===0&&Array.isArray(g[k]);});
-for(var i=0;i<keys.length;i++){try{var ch=g[keys[i]];ch.push([['__undiscord_pc__'+Date.now()],{},function(r){req=r;}]);if(req&&req.c)break;req=null;}catch(e){}}
+function ok(t){return t&&(t.indexOf('mfa.')===0||t.split('.').length>=3)&&t.length>=50;}
+function fromMod(m){if(!m||!m.exports)return'';var ex=m.exports,f=function(fn){if(typeof fn!=='function')return'';try{var r=norm(String(fn()||''));return ok(r)?r:'';}catch(e){return'';}};var g='';try{var d=ex.default&&Object.getOwnPropertyDescriptor(ex.default,'getToken');if(d&&typeof d.get==='function'){g=norm(String(d.get.call(ex.default)||''));if(ok(g))return g;}}catch(e){}return f(ex.default&&ex.default.getToken)||f(ex.getToken)||f(ex.default&&ex.default.getAuthorizationToken)||f(ex.getAuthorizationToken)||f(typeof ex.default==='function'?ex.default:null);}
+var t=norm(window[KEY]||'');
+if(!ok(t)&&window.webpackChunkdiscord_app){var mods=[];try{window.webpackChunkdiscord_app.push([['__undiscord_pc__'],{},function(e){for(var c in e.c)mods.push(e.c[c]);}]);}catch(e){}
+for(var i=0;i<mods.length;i++){t=fromMod(mods[i]);if(ok(t))break;}
+if(!ok(t)){var hit=mods.find(function(m){return m&&m.exports&&m.exports.default&&m.exports.default.getToken!==void 0;});if(hit){var gt=hit.exports.default.getToken;if(typeof gt==='function')t=norm(String(gt()||''));else t=fromMod(hit);}}
+}
+if(!ok(t)){var g=window,req=null,keys=Object.keys(g).filter(function(k){return k.indexOf('webpackChunk')===0&&Array.isArray(g[k]);});
+for(var i=0;i<keys.length;i++){try{var ch=g[keys[i]];ch.push([['__undiscord_pc2__'+Date.now()],{},function(r){req=r;}]);if(req&&req.c)break;req=null;}catch(e){}}
 if(!req&&typeof g.__webpack_require__==='function'&&g.__webpack_require__.c)req=g.__webpack_require__;
-if(!req||!req.c)throw new Error('webpack require not found');
-var mods=Object.values(req.c),t='';
-for(var j=0;j<mods.length;j++){t=fromMod(mods[j]);if(t)break;}
-if(!t)throw new Error('getToken module not found');
+if(req&&req.c){var mods=Object.values(req.c);for(var j=0;j<mods.length;j++){t=fromMod(mods[j]);if(ok(t))break;}}}
+if(!ok(t))throw new Error('getToken module not found');
 window.postMessage({source:'undiscord',id:'${reqId}',token:t},'*');
 }catch(e){window.postMessage({source:'undiscord',id:'${reqId}',error:String(e)},'*');}})();`;
 	    script.onerror = () => { cleanup(); reject(new Error('page-context script blocked')); };
@@ -3321,8 +4435,19 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t},'*');
 	}
 
 	async function getToken() {
+	  installPageAuthCaptureHook();
+
+	  const captured = readCapturedAuthToken();
+	  if (captured) {
+	    log.verb('Token source: captured from Discord API traffic');
+	    return captured;
+	  }
+
 	  const storageToken = readTokenFromPageLocalStorage();
-	  if (storageToken) return storageToken;
+	  if (storageToken) {
+	    log.verb('Token source: localStorage');
+	    return storageToken;
+	  }
 
 	  log.info('Token not in storage — trying webpack…');
 	  try {
@@ -3343,7 +4468,7 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t},'*');
 	  } catch (err) {
 	    log.verb('Page context:', err?.message || err);
 	  }
-	  throw new Error('token auto-detection failed');
+	  throw new Error('token auto-detection failed — switch channel or send a message in Discord, then click Fill again');
 	}
 
 	function getAuthorId() {
@@ -3390,17 +4515,145 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t},'*');
 	  else alert('Could not find the Channel ID!\nPlease make sure you are on a Channel or DM.');
 	}
 
-	async function fillToken() {
-	  try {
-	    return await getToken();
-	  } catch (err) {
-	    log.verb(err);
-	    log.error('Could not automatically detect Authorization Token!');
-	    log.info(`Please make sure ${TOOL_NAME} is up to date`);
-	    log.info('Tip: click Advanced → Token → Fill with DevTools closed, or paste a token manually.');
-	    log.debug('Firefox DevTools open can block autofill — close Ctrl+Shift+K and try Fill again.');
+	let tokenAutofillTimer = null;
+	let tokenAutofillInFlight = false;
+	let tokenVaultUnlocked = false;
+
+	function updateTokenStatusBadge() {
+	  const badge = $('span#tokenStatusBadge');
+	  const input = $('input#token');
+	  if (!badge || !input) return;
+	  const has = !!input.value.trim();
+	  badge.textContent = has ? 'Ready' : 'Not set';
+	  badge.className = `token-status-badge ${has ? 'token-status-ready' : 'token-status-missing'}`;
+	  badge.title = has
+	    ? 'A token is loaded (value is never shown here)'
+	    : 'No token yet — auto-fill will retry, or open the danger section';
+	}
+
+	function syncTokenCopyRowVisibility() {
+	  const row = $('div#tokenCopyRow');
+	  if (!row) return;
+	  row.hidden = !($('input#enableTokenCopy')?.checked && tokenVaultUnlocked);
+	}
+
+	function resetTokenVaultGate() {
+	  tokenVaultUnlocked = false; // re-ack required each time the section is closed
+	  const gate = $('div#tokenVaultGate');
+	  const inner = $('div#tokenVaultInner');
+	  const ack = $('input#tokenVaultAckCheckbox');
+	  const unlock = $('button#tokenVaultUnlock');
+	  const copyEnable = $('input#enableTokenCopy');
+	  if (gate) gate.hidden = false;
+	  if (inner) inner.hidden = true;
+	  if (ack) ack.checked = false;
+	  if (unlock) unlock.disabled = true;
+	  if (copyEnable) copyEnable.checked = false;
+	  syncTokenCopyRowVisibility();
+	}
+
+	function unlockTokenVault() {
+	  tokenVaultUnlocked = true;
+	  const gate = $('div#tokenVaultGate');
+	  const inner = $('div#tokenVaultInner');
+	  if (gate) gate.hidden = true;
+	  if (inner) inner.hidden = false;
+	  syncTokenCopyRowVisibility();
+	  tryAutofillToken({ silent: true, force: false }).catch(() => {});
+	}
+
+	async function copyTokenAction() {
+	  if (!tokenVaultUnlocked) {
+	    log.warn('Unlock ⚠ Account token (bottom of sidebar) before copying.');
+	    return;
 	  }
-	  return '';
+	  if (!$('input#enableTokenCopy')?.checked) {
+	    log.warn('Enable the copy checkbox in the token section first.');
+	    return;
+	  }
+	  const token = $('input#token')?.value?.trim();
+	  if (!token) {
+	    log.warn('No token loaded to copy. Use Fill or wait for auto-fill.');
+	    return;
+	  }
+	  const ok = await ask(
+	    'Copy your Discord authorization token to the clipboard?\n\n'
+	    + 'Pasting this into Discord chats, DMs, support tickets, screenshots, or unknown websites gives others FULL access to your account until you change your password.\n\n'
+	    + 'The field will stay masked (dots) — only the clipboard receives the real value.\n\n'
+	    + 'Copy anyway?',
+	  );
+	  if (!ok) return;
+	  try {
+	    if (navigator.clipboard?.writeText) {
+	      await navigator.clipboard.writeText(token);
+	    } else {
+	      throw new Error('Clipboard API unavailable');
+	    }
+	    log.success('Token copied to clipboard. Clear clipboard when finished on a shared PC.');
+	  } catch (err) {
+	    try {
+	      const input = $('input#token');
+	      const prev = input.type;
+	      input.type = 'text';
+	      input.select();
+	      input.setSelectionRange(0, token.length);
+	      if (!document.execCommand('copy')) throw err;
+	      log.success('Token copied to clipboard (fallback). Clear clipboard when finished on a shared PC.');
+	      input.type = prev;
+	    } catch {
+	      log.error('Could not copy token.', err?.message || err);
+	    }
+	  }
+	}
+
+	async function tryAutofillToken(opts = {}) {
+	  const { silent = true, force = false } = opts;
+	  const autoOn = $('input#autoFillToken')?.checked !== false;
+	  if (!autoOn && !force) return '';
+	  const input = $('input#token');
+	  if (!input) return '';
+	  if (input.value.trim() && !force) {
+	    updateTokenStatusBadge();
+	    return input.value.trim();
+	  }
+	  if (tokenAutofillInFlight) return input.value.trim();
+	  tokenAutofillInFlight = true;
+	  try {
+	    const token = await getToken();
+	    if (token) {
+	      input.value = token;
+	      if (!silent) log.success('Authorization token detected and filled.');
+	      else log.verb('Authorization token auto-filled.');
+	    }
+	    updateTokenStatusBadge();
+	    return token || '';
+	  } catch (err) {
+	    updateTokenStatusBadge();
+	    if (!silent) {
+	      log.verb(err);
+	      log.error('Could not automatically detect Authorization Token!');
+	      log.info(`Please make sure ${TOOL_NAME} is up to date`);
+	      log.info('Switch to any channel (or send one message), wait 2s, then click Fill again.');
+	      log.info(`Manager: ${userscriptManager}. Violentmonkey/Firefox: reload tab after update, then interact with Discord before Fill.`);
+	      log.info('Or paste a token manually in ⚠ Account token (unlock the danger section first).');
+	    }
+	    return '';
+	  } finally {
+	    tokenAutofillInFlight = false;
+	  }
+	}
+
+	function scheduleTokenAutofill(reason = 'background') {
+	  if ($('input#autoFillToken')?.checked === false) return;
+	  clearTimeout(tokenAutofillTimer);
+	  const delayMs = reason === 'init' ? 2500 : 900;
+	  tokenAutofillTimer = setTimeout(() => {
+	    tryAutofillToken({ silent: true }).catch(() => {});
+	  }, delayMs);
+	}
+
+	async function fillToken() {
+	  return tryAutofillToken({ silent: false, force: true });
 	}
 
 	function getServerChannelIdsFromDom(guildId) {
@@ -3430,9 +4683,12 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t},'*');
 	  const out = new Map();
 
 	  try {
-	    const resp = await fetch(`https://discord.com/api/v9/guilds/${gid}/channels`, {
-	      headers: { Authorization: authToken },
-	    });
+	    const resp = await discordApiFetch(
+	      `https://discord.com/api/v9/guilds/${gid}/channels`,
+	      authToken,
+	      {},
+	      { guildId: gid },
+	    );
 	    if (!resp.ok) throw new Error(`channels ${resp.status}`);
 	    const channels = await resp.json();
 	    if (!Array.isArray(channels)) throw new Error('channels not array');
@@ -3446,9 +4702,12 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t},'*');
 	    }
 
 	    try {
-	      const tResp = await fetch(`https://discord.com/api/v9/guilds/${gid}/threads/active`, {
-	        headers: { Authorization: authToken },
-	      });
+	      const tResp = await discordApiFetch(
+	        `https://discord.com/api/v9/guilds/${gid}/threads/active`,
+	        authToken,
+	        {},
+	        { guildId: gid },
+	      );
 	      if (tResp.ok) {
 	        const tData = await tResp.json();
 	        for (const th of (tData?.threads || [])) {
@@ -3478,9 +4737,11 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t},'*');
 	    for (const parentId of archiveParents) {
 	      for (const endpoint of archivePaths) {
 	        try {
-	          const aResp = await fetch(
+	          const aResp = await discordApiFetch(
 	            `https://discord.com/api/v9/channels/${parentId}/${endpoint.path}?limit=100`,
-	            { headers: { Authorization: authToken } },
+	            authToken,
+	            {},
+	            { guildId: gid, channelId: parentId },
 	          );
 	          if (!aResp.ok) continue;
 	          const aData = await aResp.json();
@@ -3589,9 +4850,12 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t},'*');
 
 	  for (let attempt = 0; attempt < 4; attempt++) {
 	    try {
-	      const resp = await fetch(searchUrl + queryString(params), {
-	        headers: { Authorization: authToken },
-	      });
+	      const resp = await discordApiFetch(
+	        searchUrl + queryString(params),
+	        authToken,
+	        {},
+	        { guildId, channelId: ch },
+	      );
 	      if (resp.status === 202) {
 	        const body = await resp.json().catch(() => ({}));
 	        await wait(Math.max(500, (Number(body?.retry_after) || 1) * 1000));
@@ -3687,6 +4951,7 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t},'*');
 	  if (!ui.undiscordWindow) return;
 	  undiscordCore.options.verboseLog = $('input#verboseLog').checked;
 	  undiscordCore.options.logEveryDeletion = $('input#logDeletions').checked;
+	  undiscordCore.options.debugApiHeaders = $('input#debugApiHeaders').checked;
 	}
 
 	function onLogOptionChange(kind) {
@@ -3697,10 +4962,15 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t},'*');
 	    log.info(undiscordCore.options.verboseLog
 	      ? 'Verbose log enabled — extra detail from the next page fetch onward.'
 	      : 'Verbose log disabled.');
-	  } else {
+	  } else if (kind === 'deletions') {
 	    log.info(undiscordCore.options.logEveryDeletion
 	      ? 'Per-message log enabled — upcoming deletes will be listed.'
 	      : 'Per-message log disabled.');
+	  } else if (kind === 'apiDebug') {
+	    if (undiscordCore.options.debugApiHeaders) resetApiDebugLogKeys();
+	    log.info(undiscordCore.options.debugApiHeaders
+	      ? 'API header debug on — next request of each type (search, delete, …) logs a safe summary here.'
+	      : 'API header debug off.');
 	  }
 	}
 
@@ -3726,8 +4996,8 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t},'*');
 	    elm: ui.undiscordWindow,
 	    moveHandle: $('.header'),
 	    options: {
-	      minWidth: WINDOW_WIDTH,
-	      maxWidth: WINDOW_WIDTH,
+	      minWidth: WINDOW_MIN_WIDTH,
+	      maxWidth: Math.floor(window.innerWidth * 0.96),
 	    },
 	  });
 	  requestAnimationFrame(() => centerUndiscordWindow());
@@ -3885,6 +5155,7 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t},'*');
 	    ui.undiscordBtn.style.color = hidden
 	      ? 'var(--interactive-text-default, var(--interactive-normal))'
 	      : 'var(--interactive-text-hover, var(--interactive-active))';
+	    if (!hidden) scheduleTokenAutofill('panel');
 	  }
 
 	  // cached elements
@@ -3913,7 +5184,10 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t},'*');
 	  $('button#start').onclick = startAction;
 	  $('button#stop').onclick = stopAction;
 	  $('button#copyLog').onclick = copyLogAction;
-	  $('button#clear').onclick = () => ui.logArea.innerHTML = '';
+	  $('button#clear').onclick = () => {
+	    clearLogForRun();
+	    updateFingerprintStatusBar('unknown');
+	  };
 	  $('select#runProfile').onchange = (e) => applyRunProfileToUI(e.target.value);
 	  $('input#deleteAllChannels').onchange = syncDeleteAllChannelsUI;
 	  $('button#resumeCheckpoint').onclick = () => {
@@ -3931,6 +5205,7 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t},'*');
 	  function tryAutofillFromRoute() {
 	    if (undiscordCore.state.running) return;
 	    tryAutofillAuthorId();
+	    scheduleTokenAutofill('route');
 	    if (!$('input#autofillOnNavigate').checked) return;
 	    const m = location.pathname.match(/\/channels\/([\w@]+)\/(\d+)/);
 	    if (!m) return;
@@ -3980,10 +5255,56 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t},'*');
 	    if (id) $('input#maxId').value = id;
 	    toggleWindow();
 	  };
-	  $('button#getToken').onclick = async () => { $('input#token').value = await fillToken(); };
+	  const tokenVault = $('details#tokenVaultSection');
+	  const tokenVaultSummary = tokenVault?.querySelector('summary.token-vault-summary');
+	  if (tokenVaultSummary) {
+	    tokenVaultSummary.addEventListener('click', (e) => {
+	      if (tokenVault.open || tokenVaultUnlocked) return;
+	      e.preventDefault();
+	      tokenVault.open = true;
+	      resetTokenVaultGate();
+	    });
+	  }
+	  if (tokenVault) {
+	    tokenVault.addEventListener('toggle', () => {
+	      if (!tokenVault.open) resetTokenVaultGate();
+	    });
+	  }
+	  $('input#tokenVaultAckCheckbox')?.addEventListener('change', (e) => {
+	    const unlock = $('button#tokenVaultUnlock');
+	    if (unlock) unlock.disabled = !e.target.checked;
+	  });
+	  $('button#tokenVaultUnlock')?.addEventListener('click', () => {
+	    if (!$('input#tokenVaultAckCheckbox')?.checked) return;
+	    unlockTokenVault();
+	  });
+	  $('button#getToken')?.addEventListener('click', async () => {
+	    if (!tokenVaultUnlocked) {
+	      log.warn('Open ⚠ Account token (bottom of sidebar), acknowledge the warnings, then Show token field — or rely on background auto-fill.');
+	      return;
+	    }
+	    await fillToken();
+	  });
+	  $('button#clearToken')?.addEventListener('click', () => {
+	    const input = $('input#token');
+	    if (input) input.value = '';
+	    updateTokenStatusBadge();
+	    log.info('Token cleared from the form (not revoked on Discord).');
+	  });
+	  $('input#enableTokenCopy')?.addEventListener('change', syncTokenCopyRowVisibility);
+	  $('button#copyToken')?.addEventListener('click', () => { copyTokenAction().catch(() => {}); });
+	  $('input#autoFillToken')?.addEventListener('change', (e) => {
+	    if (e.target.checked) scheduleTokenAutofill('enabled');
+	    else updateTokenStatusBadge();
+	  });
+	  $('input#token')?.addEventListener('input', updateTokenStatusBadge);
+	  resetTokenVaultGate();
+	  updateTokenStatusBadge();
+	  scheduleTokenAutofill('init');
 
 	  $('input#verboseLog').onchange = () => onLogOptionChange('verbose');
 	  $('input#logDeletions').onchange = () => onLogOptionChange('deletions');
+	  $('input#debugApiHeaders').onchange = () => onLogOptionChange('apiDebug');
 
 	  $('input#searchDelay').onchange = () => readDelayInput('searchDelay', SEARCH_DELAY_MS);
 	  $('input#deleteDelay').onchange = () => readDelayInput('deleteDelay', DELETE_DELAY_MS);
@@ -4026,6 +5347,27 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t},'*');
 	  setLogFn(printLog);
 
 	  setupUndiscordCore();
+	  refreshClientHeaderContextSync(false);
+	  if (clientHeadersCache?.superProperties) {
+	    const src = readCapturedSuperProperties() ? 'captured while browsing' : 'ready';
+	    updateFingerprintStatusBar('full', src);
+	  }
+	}
+
+	function scrollLogToBottom() {
+	  if (!ui.autoScroll?.checked || !ui.logArea) return;
+	  requestAnimationFrame(() => {
+	    ui.logArea.scrollTop = ui.logArea.scrollHeight;
+	  });
+	}
+
+	function renderProgressFooter(batchPrefix, percent, value, max, elapsed, remaining) {
+	  const prefix = batchPrefix ? `<span class="progress-batch">${escapeHTML(batchPrefix)}</span>` : '';
+	  return `${prefix}<span class="progress-seg progress-count">${escapeHTML(percent)} <span class="progress-value">(${value}/${max})</span></span>`
+	    + '<span class="progress-sep" aria-hidden="true"></span>'
+	    + `<span class="progress-seg progress-elapsed" title="Elapsed time"><span class="progress-label">Elapsed</span><span class="progress-time">${escapeHTML(elapsed)}</span></span>`
+	    + '<span class="progress-sep" aria-hidden="true"></span>'
+	    + `<span class="progress-seg progress-remaining" title="Estimated time remaining"><span class="progress-label">Remaining</span><span class="progress-time">${escapeHTML(remaining)}</span></span>`;
 	}
 
 	function printLog(type = '', args) {
@@ -4041,7 +5383,7 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t},'*');
 	  }).filter(v => v !== null).join(' ');
 	  if (!text) return;
 	  ui.logArea.insertAdjacentHTML('beforeend', `<div class="log log-${type}">${text}</div>`);
-	  if (ui.autoScroll.checked) ui.logArea.querySelector('div:last-child').scrollIntoView(false);
+	  scrollLogToBottom();
 	  if (type === 'error') console.error(PREFIX, ...Array.from(args));
 	  else if (type === 'debug') console.debug(PREFIX, ...Array.from(args));
 	}
@@ -4056,6 +5398,7 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t},'*');
 	    ui.undiscordBtn.classList.add('running');
 	    ui.progressMain.style.display = 'block';
 	    ui.percent.style.display = 'block';
+	    scrollLogToBottom();
 	  };
 
 	  undiscordCore.onProgress = (state, stats) => {
@@ -4071,7 +5414,7 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t},'*');
 	    const batchPrefix = state._batchActive && state._batchTotal
 	      ? `Ch ${state._batchIndex}/${state._batchTotal} · `
 	      : '';
-	    ui.percent.innerHTML = `${batchPrefix}${percent} (${value}/${max}) Elapsed: ${elapsed} Remaining: ${remaining}`;
+	    ui.percent.innerHTML = renderProgressFooter(batchPrefix, percent, value, max, elapsed, remaining);
 
 	    ui.progressIcon.value = value;
 	    ui.progressMain.value = value;
@@ -4222,8 +5565,12 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t},'*');
 	    }
 	  }
 
-	  // clear logArea
-	  ui.logArea.innerHTML = '';
+	  // clear run log but keep fingerprint status bar at the top
+	  clearLogForRun();
+	  resetApiDebugLogKeys();
+
+	  await ensureClientHeadersReady();
+	  log.info('Starting message search and delete…');
 
 	  undiscordCore.resetState();
 	  undiscordCore.options = {
@@ -4245,6 +5592,7 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t},'*');
 	    emptyPageRetries: Number.isNaN(emptyPageRetries) ? 2 : emptyPageRetries,
 	    verboseLog: undiscordCore.options.verboseLog,
 	    logEveryDeletion: undiscordCore.options.logEveryDeletion,
+	    debugApiHeaders: undiscordCore.options.debugApiHeaders,
 	    pipeline,
 	    mediaScanMode,
 	    mediaBatchSize: Number.isNaN(mediaBatchSize) ? 50 : Math.max(5, Math.min(100, mediaBatchSize)),
@@ -4323,5 +5671,6 @@ window.postMessage({source:'undiscord',id:'${reqId}',token:t},'*');
 
 	// ---- END Undiscord ----
 
+	scheduleEarlyPageCapture();
 	initUI();
 })();

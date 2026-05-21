@@ -55,7 +55,7 @@ The script header requests:
 
 - Needed to search and delete on your behalf.
 - **Fill** tries, in order: Discord `localStorage` (via a same-origin iframe), webpack module scan, classic webpack chunk push, then a short-lived **page-context script** that posts the token back via `window.postMessage` (no network; only if earlier methods fail).
-- You may paste a token manually under **Advanced → Token**.
+- You may paste a token manually under **⚠ Account token** (own sidebar section, below Advanced).
 - The token is sent in the `Authorization` header to **`discord.com` only** — not to this repository.
 - **We do not log, copy, or transmit your token to our servers** (we have none).
 
